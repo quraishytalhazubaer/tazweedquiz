@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <title>তাজউইদ কুইজ</title>
+  <style>
+    body {
+      font-family: 'Siyam Rupali', Arial, sans-serif;
+      direction: rtl;
+      text-align: right;
+      margin: 20px;
+    }
+
+    .question {
+      margin-bottom: 30px;
+    }
+
+    .blank {
+      display: inline-block;
+      min-width: 120px;
+      min-height: 30px;
+      border: 2px dashed #888;
+      padding: 5px 10px;
+      margin: 0 5px;
+    }
+
+    .word-bank {
+      margin-top: 10px;
+    }
+
+    .word {
+      display: inline-block;
+      padding: 8px 12px;
+      background-color: #e0f7fa;
+      margin: 5px;
+      cursor: grab;
+      border-radius: 5px;
+    }
+
+    .correct {
+      background-color: #c8e6c9 !important;
+      border: 2px solid green;
+    }
+
+    .incorrect {
+      background-color: #ffcdd2 !important;
+      border: 2px solid red;
+    }
+
+    #score {
+      font-weight: bold;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin-top: 20px;
+      margin-right: 10px;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+    }
+
+    .check-btn {
+      background-color: #4CAF50;
+    }
+
+    .reset-btn {
+      background-color: #f44336;
+    }
+  </style>
+</head>
+<body>
+
+<h2>তাজউইদ কুইজ (আয়াত প্রমাণে আধারিত)</h2>
+<p>প্রত্যেক্ষের আয়াত দেখে তাজউইদের নাম ড্র্যাগ-এন্ড-ড্রপ করে ফাঁকায় পূরণ করো।</p>
+
+<div class="question">
+  <p>১। “<strong>وَلَا الضَّآلِّينَ</strong>” — এখানে রয়েছে <span class="blank" id="q1" ondrop="drop(event, 'q1')" ondragover="allowDrop(event)"></span>
+    <audio controls src="audio/1.mp3"></audio>
+  </p>
+</div>
+
+<div class="question">
+  <p>২। “<strong>مِن بَعْدِ</strong>” — এখানে <span class="blank" id="q2" ondrop="drop(event, 'q2')" ondragover="allowDrop(event)"></span> প্রয়োগ হয়েছে।
+    <audio controls src="audio/2.mp3"></audio>
+  </p>
+</div>
+
+<div class="question">
+  <p>৩। “<strong>إِنَّ اللَّهَ</strong>” — এখানে রয়েছে <span class="blank" id="q3" ondrop="drop(event, 'q3')" ondragover="allowDrop(event)"></span>
+    <audio controls src="audio/3.mp3"></audio>
+  </p>
+</div>
+
+<div class="question">
+  <p>৪। “<strong>مِنْ عَمَلٍ</strong>” — এখানে রয়েছে <span class="blank" id="q4" ondrop="drop(event, 'q4')" ondragover="allowDrop(event)"></span>
+    <audio controls src="audio/4.mp3"></audio>
+  </p>
+</div>
+
+<div class="question">
+  <p>৫। “<strong>قَالُوا۟ إِنَّآ</strong>” — এখানে রয়েছে <span class="blank" id="q5" ondrop="drop(event, 'q5')" ondragover="allowDrop(event)"></span>
+    <audio controls src="audio/5.mp3"></audio>
+  </p>
+</div>
+
+<h3>শব্দ ব্যাংক:</h3>
+<div class="word-bank">
+  <div class="word" draggable="true" ondragstart="drag(event)" id="w1">মাদ লাজিম</div>
+  <div class="word" draggable="true" ondragstart="drag(event)" id="w2">ইদঘাম গুন্নাহ সহ</div>
+  <div class="word" draggable="true" ondragstart="drag(event)" id="w3">গুন্নাহ</div>
+  <div class="word" draggable="true" ondragstart="drag(event)" id="w4">ইখফা</div>
+  <div class="word" draggable="true" ondragstart="drag(event)" id="w5">ইযহার</div>
+</div>
+
+<div>
+  <button class="check-btn" onclick="checkFinalScore()">ফাইনাল স্কোর দেখাউ</button>
+  <button class="reset-btn" onclick="resetAll()">পুনরায় করুন</button>
+</div>
+
+<div id="score"></div>
+
+<script>
+  const correctAnswers = {
+    q1: "মাদ লাজিম",
+    q2: "ইদঘাম গুন্নাহ সহ",
+    q3: "গুন্নাহ",
+    q4: "ইখফা",
+    q5: "ইযহার"
+  };
+
+  function allowDrop(ev) {
+    ev.preventDefault();
+  }
+
+  function drag(ev) {
+    ev.dataTransfer.setData("text", ev.target.id);
+  }
+
+  function drop(ev, questionId) {
+    ev.preventDefault();
+    const wordId = ev.dataTransfer.getData("text");
+    const wordElement = document.getElementById(wordId);
+    const dropTarget = document.getElementById(questionId);
+
+    dropTarget.innerHTML = '';
+    dropTarget.classList.remove('correct', 'incorrect');
+
+    const cloned = wordElement.cloneNode(true);
+    cloned.setAttribute("draggable", "false");
+    dropTarget.appendChild(cloned);
+
+    const userAnswer = cloned.innerText.trim();
+    if (userAnswer === correctAnswers[questionId]) {
+      dropTarget.classList.add("correct");
+    } else {
+      dropTarget.classList.add("incorrect");
+    }
+  }
+
+  function checkFinalScore() {
+    let score = 0;
+    for (let i = 1; i <= 5; i++) {
+      const answerBox = document.getElementById('q' + i);
+      const userAnswer = answerBox.innerText.trim();
+      if (userAnswer === correctAnswers['q' + i]) {
+        score++;
+      }
+    }
+    document.getElementById('score').innerText = `আপনি স্কোর হলো ${score} এক্শ থেকে 5`;
+  }
+
+  function resetAll() {
+    for (let i = 1; i <= 5; i++) {
+      const box = document.getElementById('q' + i);
+      box.innerHTML = '';
+      box.classList.remove("correct", "incorrect");
+    }
+    document.getElementById('score').innerText = '';
+  }
+</script>
+
+</body>
+</html>
