@@ -74,45 +74,45 @@
 <body>
 
 <h2>তাজউইদ কুইজ</h2>
-<p>প্রত্যেক্ষের আয়াত দেখে তাজউইদের নাম ড্র্যাগ-এন্ড-ড্রপ করে ফাঁকায় পূরণ করুন।</p>
+<p>প্রত্যক্ষের আয়াত দেখে তাজউইদের নাম ড্র্যাগ-এন্ড-ড্রপ করে ফাঁকায় পূরণ করুন।</p>
 
 <div class="question">
-  <p>১। “<strong>وَلَا الضَّآلِّينَ</strong>” — এখানে রয়েছে <span class="blank" id="q1" ondrop="drop(event, 'q1')" ondragover="allowDrop(event)"></span>
+  <p>১। “<strong>وَلَا الضَّآلِّينَ</strong>” — এখানে রয়েছে <span class="blank" id="q1" onclick="fillBlank('q1')"></span>
     <audio controls src="audio/1.mp3"></audio>
   </p>
 </div>
 
 <div class="question">
-  <p>২। “<strong>مِن بَعْدِ</strong>” — এখানে <span class="blank" id="q2" ondrop="drop(event, 'q2')" ondragover="allowDrop(event)"></span> প্রয়োগ হয়েছে।
+  <p>২। “<strong>مِن بَعْدِ</strong>” — এখানে <span class="blank" id="q2" onclick="fillBlank('q2')"></span> প্রয়োগ হয়েছে।
     <audio controls src="audio/2.mp3"></audio>
   </p>
 </div>
 
 <div class="question">
-  <p>৩। “<strong>إِنَّ اللَّهَ</strong>” — এখানে রয়েছে <span class="blank" id="q3" ondrop="drop(event, 'q3')" ondragover="allowDrop(event)"></span>
+  <p>৩। “<strong>إِنَّ اللَّهَ</strong>” — এখানে রয়েছে <span class="blank" id="q3" onclick="fillBlank('q3')"></span>
     <audio controls src="audio/3.mp3"></audio>
   </p>
 </div>
 
 <div class="question">
-  <p>৪। “<strong>مِنْ عَمَلٍ</strong>” — এখানে রয়েছে <span class="blank" id="q4" ondrop="drop(event, 'q4')" ondragover="allowDrop(event)"></span>
+  <p>৪। “<strong>مِنْ عَمَلٍ</strong>” — এখানে রয়েছে <span class="blank" id="q4" onclick="fillBlank('q4')"></span>
     <audio controls src="audio/4.mp3"></audio>
   </p>
 </div>
 
 <div class="question">
-  <p>৫। “<strong>قَالُوا۟ إِنَّآ</strong>” — এখানে রয়েছে <span class="blank" id="q5" ondrop="drop(event, 'q5')" ondragover="allowDrop(event)"></span>
+  <p>৫। “<strong>قَالُوا۟ إِنَّآ</strong>” — এখানে রয়েছে <span class="blank" id="q5" onclick="fillBlank('q5')"></span>
     <audio controls src="audio/5.mp3"></audio>
   </p>
 </div>
 
 <h3>শব্দ ব্যাংক:</h3>
 <div class="word-bank">
-  <div class="word" draggable="true" ondragstart="drag(event)" id="w1">মাদ লাজিম</div>
-  <div class="word" draggable="true" ondragstart="drag(event)" id="w2">ইদঘাম গুন্নাহ সহ</div>
-  <div class="word" draggable="true" ondragstart="drag(event)" id="w3">গুন্নাহ</div>
-  <div class="word" draggable="true" ondragstart="drag(event)" id="w4">ইখফা</div>
-  <div class="word" draggable="true" ondragstart="drag(event)" id="w5">ইযহার</div>
+  <div class="word" id="w1" onclick="fillSelectedBlank('w1')">মাদ লাজিম</div>
+  <div class="word" id="w2" onclick="fillSelectedBlank('w2')">ইদঘাম গুন্নাহ সহ</div>
+  <div class="word" id="w3" onclick="fillSelectedBlank('w3')">গুন্নাহ</div>
+  <div class="word" id="w4" onclick="fillSelectedBlank('w4')">ইখফা</div>
+  <div class="word" id="w5" onclick="fillSelectedBlank('w5')">ইযহার</div>
 </div>
 
 <div>
@@ -131,40 +131,50 @@
     q5: "ইযহার"
   };
 
-  function allowDrop(ev) {
-    ev.preventDefault();
+  let selectedBlankId = null;
+  let userAnswers = {};
+
+  function fillBlank(blankId) {
+    // Remove highlight from all blanks
+    document.querySelectorAll('.blank').forEach(b => b.style.outline = '');
+    // Highlight selected blank
+    document.getElementById(blankId).style.outline = '2px solid #2196F3';
+    selectedBlankId = blankId;
   }
 
-  function drag(ev) {
-    ev.dataTransfer.setData("text", ev.target.id);
-  }
+  function fillSelectedBlank(wordId) {
+    if (!selectedBlankId) return;
+    const blank = document.getElementById(selectedBlankId);
+    const wordElem = document.getElementById(wordId);
 
-  function drop(ev, questionId) {
-    ev.preventDefault();
-    const wordId = ev.dataTransfer.getData("text");
-    const wordElement = document.getElementById(wordId);
-    const dropTarget = document.getElementById(questionId);
+    // Fill the blank
+    blank.innerHTML = '';
+    blank.classList.remove('correct', 'incorrect');
+    const cloned = wordElem.cloneNode(true);
+    cloned.onclick = null; // Prevent nested click
+    cloned.style.outline = '';
+    blank.appendChild(cloned);
 
-    dropTarget.innerHTML = '';
-    dropTarget.classList.remove('correct', 'incorrect');
-
-    const cloned = wordElement.cloneNode(true);
-    cloned.setAttribute("draggable", "false");
-    dropTarget.appendChild(cloned);
-
+    // Store answer
     const userAnswer = cloned.innerText.trim();
-    if (userAnswer === correctAnswers[questionId]) {
-      dropTarget.classList.add("correct");
+    userAnswers[selectedBlankId] = userAnswer;
+
+    // Mark correct/incorrect
+    if (userAnswer === correctAnswers[selectedBlankId]) {
+      blank.classList.add('correct');
     } else {
-      dropTarget.classList.add("incorrect");
+      blank.classList.add('incorrect');
     }
+
+    // Remove highlight from blank
+    blank.style.outline = '';
+    selectedBlankId = null;
   }
 
   function checkFinalScore() {
     let score = 0;
     for (let i = 1; i <= 5; i++) {
-      const answerBox = document.getElementById('q' + i);
-      const userAnswer = answerBox.innerText.trim();
+      const userAnswer = userAnswers['q' + i] || '';
       if (userAnswer === correctAnswers['q' + i]) {
         score++;
       }
@@ -173,11 +183,14 @@
   }
 
   function resetAll() {
+    userAnswers = {};
+    selectedBlankId = null;
     for (let i = 1; i <= 5; i++) {
       const box = document.getElementById('q' + i);
       box.innerHTML = '';
       box.classList.remove("correct", "incorrect");
     }
+    document.querySelectorAll('.word').forEach(w => w.style.outline = '');
     document.getElementById('score').innerText = '';
   }
 </script>
