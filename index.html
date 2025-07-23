@@ -1,40 +1,98 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>তাজউইদ কুইজ</title>
   <style>
     body {
       font-family: 'Siyam Rupali', Arial, sans-serif;
-      direction: rtl;
-      text-align: right;
-      margin: 20px;
+      background-color: #f5f5f5;
+      padding: 20px;
+      margin-bottom: 170px;
+    }
+
+    h2, .instructions, #score {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    .heading {
+      text-align: center;
+      margin-top: 20px;
     }
 
     .question {
-      margin-bottom: 30px;
+      background-color: #ffffff;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      text-align: left;
+    }
+
+    .verse {
+      font-weight: bold;
+      direction: rtl;
+      display: inline-block;
+      margin-bottom: 5px;
+      color: #1c3f60;
     }
 
     .blank {
       display: inline-block;
-      min-width: 120px;
-      min-height: 30px;
-      border: 2px dashed #888;
-      padding: 5px 10px;
+      min-width: 130px;
+      min-height: 35px;
+      border: 2px dashed #aaa;
+      border-radius: 6px;
+      padding: 8px 12px;
       margin: 0 5px;
+      background-color: #fafafa;
+      font-weight: bold;
+      vertical-align: middle;
+    }
+
+    .blank .word {
+      margin: 2px;
+      display: inline-block;
     }
 
     .word-bank {
-      margin-top: 10px;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: #ffffff;
+      padding: 15px 20px;
+      border-top: 2px solid #ddd;
+      box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+    }
+
+    .word-bank h3 {
+      margin-top: 0;
+      text-align: left;
     }
 
     .word {
       display: inline-block;
-      padding: 8px 12px;
-      background-color: #e0f7fa;
-      margin: 5px;
+      padding: 10px 16px;
+      background-color: #dff9fb;
+      margin: 6px;
       cursor: grab;
-      border-radius: 5px;
+      border-radius: 8px;
+      font-weight: bold;
+      border: 1px solid #bbb;
+    }
+
+    .used-word {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+
+    .word:hover {
+      background-color: #c7ecee;
     }
 
     .correct {
@@ -47,88 +105,129 @@
       border: 2px solid red;
     }
 
-    #score {
-      font-weight: bold;
-      margin-top: 20px;
-    }
-
     button {
-      padding: 10px 20px;
+      padding: 12px 24px;
       margin-top: 20px;
-      margin-right: 10px;
+      margin-left: 10px;
       border: none;
-      border-radius: 5px;
+      border-radius: 8px;
       color: white;
+      font-size: 1rem;
       cursor: pointer;
+      transition: background-color 0.3s ease;
     }
 
     .check-btn {
-      background-color: #4CAF50;
+      background-color: #27ae60;
+    }
+
+    .check-btn:hover {
+      background-color: #219150;
     }
 
     .reset-btn {
-      background-color: #f44336;
+      background-color: #e74c3c;
+    }
+
+    .reset-btn:hover {
+      background-color: #c0392b;
+    }
+
+    audio {
+      vertical-align: middle;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 600px) {
+      .blank {
+        min-width: 100px;
+        display: block;
+        margin: 10px 0;
+      }
+
+      .word-bank {
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+
+      button {
+        width: 100%;
+        margin: 10px 0 0;
+      }
     }
   </style>
 </head>
 <body>
 
-<h2>তাজউইদ কুইজ</h2>
-<p>প্রত্যেক্ষের আয়াত দেখে তাজউইদের নাম ড্র্যাগ-এন্ড-ড্রপ করে ফাঁকায় পূরণ করুন।</p>
-
-<div class="question">
-  <p>১। “<strong>وَلَا الضَّآلِّينَ</strong>” — এখানে রয়েছে <span class="blank" id="q1" ondrop="drop(event, 'q1')" ondragover="allowDrop(event)"></span>
-    <audio controls src="audio/1.mp3"></audio>
-  </p>
-</div>
-
-<div class="question">
-  <p>২। “<strong>مِن بَعْدِ</strong>” — এখানে <span class="blank" id="q2" ondrop="drop(event, 'q2')" ondragover="allowDrop(event)"></span> প্রয়োগ হয়েছে।
-    <audio controls src="audio/2.mp3"></audio>
-  </p>
-</div>
-
-<div class="question">
-  <p>৩। “<strong>إِنَّ اللَّهَ</strong>” — এখানে রয়েছে <span class="blank" id="q3" ondrop="drop(event, 'q3')" ondragover="allowDrop(event)"></span>
-    <audio controls src="audio/3.mp3"></audio>
-  </p>
-</div>
-
-<div class="question">
-  <p>৪। “<strong>مِنْ عَمَلٍ</strong>” — এখানে রয়েছে <span class="blank" id="q4" ondrop="drop(event, 'q4')" ondragover="allowDrop(event)"></span>
-    <audio controls src="audio/4.mp3"></audio>
-  </p>
-</div>
-
-<div class="question">
-  <p>৫। “<strong>قَالُوا۟ إِنَّآ</strong>” — এখানে রয়েছে <span class="blank" id="q5" ondrop="drop(event, 'q5')" ondragover="allowDrop(event)"></span>
-    <audio controls src="audio/5.mp3"></audio>
-  </p>
-</div>
-
-<h3>শব্দ ব্যাংক:</h3>
-<div class="word-bank">
-  <div class="word" draggable="true" ondragstart="drag(event)" id="w1">মাদ লাজিম</div>
-  <div class="word" draggable="true" ondragstart="drag(event)" id="w2">ইদঘাম গুন্নাহ সহ</div>
-  <div class="word" draggable="true" ondragstart="drag(event)" id="w3">গুন্নাহ</div>
-  <div class="word" draggable="true" ondragstart="drag(event)" id="w4">ইখফা</div>
-  <div class="word" draggable="true" ondragstart="drag(event)" id="w5">ইযহার</div>
-</div>
-
-<div>
-  <button class="check-btn" onclick="checkFinalScore()">ফাইনাল স্কোর দেখাউ</button>
-  <button class="reset-btn" onclick="resetAll()">পুনরায় করুন</button>
-</div>
-
+<h2>📘 Tajweed Quiz</h2>
+<p class="instructions">Listen to the verse and drag the correct Tajweed rule into the blank space.</p>
 <div id="score"></div>
 
+<div class="question">
+  <p><span class="verse">وَلَا الضَّآلِّينَ</span> — This contains 
+    <span class="blank" id="q1" ondrop="drop(event, 'q1')" ondragover="allowDrop(event)"></span>
+    <br><audio controls src="audio/1.mp3"></audio>
+  </p>
+</div>
+
+<div class="question">
+  <p><span class="verse">مِن بَعْدِ</span> — This contains 
+    <span class="blank" id="q2" ondrop="drop(event, 'q2')" ondragover="allowDrop(event)"></span>
+    <br><audio controls src="audio/2.mp3"></audio>
+  </p>
+</div>
+
+<div class="question">
+  <p><span class="verse">إِنَّ اللَّهَ</span> — This contains 
+    <span class="blank" id="q3" ondrop="drop(event, 'q3')" ondragover="allowDrop(event)"></span>
+    <br><audio controls src="audio/3.mp3"></audio>
+  </p>
+</div>
+
+<div class="question">
+  <p><span class="verse">مِنْ عَمَلٍ</span> — This contains 
+    <span class="blank" id="q4" ondrop="drop(event, 'q4')" ondragover="allowDrop(event)"></span>
+    <br><audio controls src="audio/4.mp3"></audio>
+  </p>
+</div>
+
+<div class="question">
+  <p><span class="verse">قَالُوا۟ إِنَّآ</span> — This contains 
+    <span class="blank" id="q5" ondrop="drop(event, 'q5')" ondragover="allowDrop(event)"></span>
+    <br><audio controls src="audio/5.mp3"></audio>
+  </p>
+</div>
+
+<div class="heading">
+  <button class="check-btn" onclick="checkFinalScore()">✅ Show Final Score</button>
+  <button class="reset-btn" onclick="resetAll()">🔁 Reset</button>
+</div>
+
+<!-- Sticky Word Bank -->
+<div class="word-bank">
+  <h3>🧠 Word Bank:</h3>
+  <div class="words">
+    <div class="word" draggable="true" ondragstart="drag(event)" id="w1">মাদ লাজিম</div>
+    <div class="word" draggable="true" ondragstart="drag(event)" id="w2">ইদঘাম গুন্নাহ সহ</div>
+    <div class="word" draggable="true" ondragstart="drag(event)" id="w3">গুন্নাহ</div>
+    <div class="word" draggable="true" ondragstart="drag(event)" id="w4">ইখফা</div>
+    <div class="word" draggable="true" ondragstart="drag(event)" id="w5">ইযহার</div>
+  </div>
+</div>
+
 <script>
+  const token = localStorage.getItem("jwt");
+  if (!token) {
+    alert("Please log in first.");
+    window.location.href = "/login.html";
+  }
+ 
   const correctAnswers = {
-    q1: "মাদ লাজিম",
-    q2: "ইদঘাম গুন্নাহ সহ",
-    q3: "গুন্নাহ",
-    q4: "ইখফা",
-    q5: "ইযহার"
+    q1: ["মাদ লাজিম"],
+    q2: ["ইদঘাম গুন্নাহ সহ"],
+    q3: ["গুন্নাহ"],
+    q4: ["ইখফা"],
+    q5: ["ইযহার"]
   };
 
   function allowDrop(ev) {
@@ -139,37 +238,65 @@
     ev.dataTransfer.setData("text", ev.target.id);
   }
 
-  function drop(ev, questionId) {
-    ev.preventDefault();
-    const wordId = ev.dataTransfer.getData("text");
-    const wordElement = document.getElementById(wordId);
-    const dropTarget = document.getElementById(questionId);
+function drop(ev, questionId) {
+  ev.preventDefault();
+  const wordId = ev.dataTransfer.getData("text");
+  const wordElement = document.getElementById(wordId);
+  const dropTarget = document.getElementById(questionId);
 
-    dropTarget.innerHTML = '';
-    dropTarget.classList.remove('correct', 'incorrect');
+  // Prevent inserting the same word twice in the same box
+  const alreadyExists = Array.from(dropTarget.children).some(
+    (child) => child.innerText.trim() === wordElement.innerText.trim()
+  );
 
-    const cloned = wordElement.cloneNode(true);
-    cloned.setAttribute("draggable", "false");
-    dropTarget.appendChild(cloned);
+  if (alreadyExists) return;
 
-    const userAnswer = cloned.innerText.trim();
-    if (userAnswer === correctAnswers[questionId]) {
-      dropTarget.classList.add("correct");
-    } else {
-      dropTarget.classList.add("incorrect");
-    }
+  // Clone word
+  const cloned = wordElement.cloneNode(true);
+  cloned.setAttribute("draggable", "false");
+  cloned.classList.add("word");
+
+  // Add click-to-remove functionality
+  cloned.addEventListener("click", function () {
+    dropTarget.removeChild(cloned);
+    wordElement.style.visibility = "visible";
+  });
+
+  dropTarget.appendChild(cloned);
+
+  // Hide original word if not already used elsewhere
+  const isUsedSomewhereElse = Array.from(document.querySelectorAll(".question-box"))
+    .some(qb => Array.from(qb.children).some(c => c.innerText.trim() === wordElement.innerText.trim()));
+
+  if (isUsedSomewhereElse) {
+    wordElement.style.visibility = "hidden";
   }
+
+  dropTarget.classList.remove("correct", "incorrect");
+}
+
 
   function checkFinalScore() {
     let score = 0;
+
     for (let i = 1; i <= 5; i++) {
-      const answerBox = document.getElementById('q' + i);
-      const userAnswer = answerBox.innerText.trim();
-      if (userAnswer === correctAnswers['q' + i]) {
+      const box = document.getElementById('q' + i);
+      const answers = Array.from(box.children).map(el => el.innerText.trim());
+      const correctSet = new Set(correctAnswers['q' + i]);
+      const userSet = new Set(answers);
+
+      const correct = correctAnswers['q' + i].every(ans => userSet.has(ans));
+      if (correct) {
+        box.classList.add('correct');
+        box.classList.remove('incorrect');
         score++;
+      } else {
+        box.classList.add('incorrect');
+        box.classList.remove('correct');
       }
     }
-    document.getElementById('score').innerText = `আপনি স্কোর হলো ${score} এক্শ থেকে 5`;
+
+    document.getElementById('score').innerText = `✅ Your Score: ${score} out of 5`;
   }
 
   function resetAll() {
@@ -178,6 +305,11 @@
       box.innerHTML = '';
       box.classList.remove("correct", "incorrect");
     }
+
+    document.querySelectorAll('.word').forEach(word => {
+      word.style.visibility = "visible";
+    });
+
     document.getElementById('score').innerText = '';
   }
 </script>
