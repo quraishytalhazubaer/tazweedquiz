@@ -1,0 +1,388 @@
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query } from 'firebase/firestore';
+import { Download, CheckCircle, User, BookOpen, ChevronLeft, ShieldCheck } from 'lucide-react';
+
+// --- Firebase Initialization ---
+// Note: In your Vercel deployment, replace this with your actual Firebase config object.
+let app, auth, db, appId;
+try {
+    const firebaseConfig = typeof __firebase_config !== 'undefined' 
+        ? JSON.parse(__firebase_config) 
+        : { apiKey: "DEMO", projectId: "demo" }; // Fallback for local testing outside canvas
+    
+    appId = typeof __app_id !== 'undefined' ? __app_id : 'tajweed-quiz-app';
+    
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+} catch (error) {
+    console.error("Firebase initialization failed:", error);
+}
+
+export default function App() {
+    const [user, setUser] = useState(null);
+    const [view, setView] = useState('student'); // 'student' or 'teacher'
+    const [submissions, setSubmissions] = useState([]);
+    const [submitStatus, setSubmitStatus] = useState(null);
+    
+    // Grading states
+    const [gradingSubmission, setGradingSubmission] = useState(null);
+    const [currentMarks, setCurrentMarks] = useState('');
+
+    // Form state for student
+    const [formData, setFormData] = useState({
+        userName: '', userId: '', userBranch: '', testDate: new Date().toISOString().split('T')[0],
+        q1: '', q2: '', q3: '', q4: '', q5: '', q6: '', q7: '', q8: ''
+    });
+
+    // 1. Initialize Auth
+    useEffect(() => {
+        if (!auth) return;
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth error:", err);
+            }
+        };
+        initAuth();
+
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    // 2. Fetch Submissions (Teacher View)
+    useEffect(() => {
+        if (!user || !db || view !== 'teacher') return;
+
+        const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'submissions'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            // Sort by latest first
+            data.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+            setSubmissions(data);
+        }, (error) => {
+            console.error("Error fetching submissions:", error);
+        });
+
+        return () => unsubscribe();
+    }, [user, view]);
+
+    // Handle form input changes
+    const handleChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    // Handle Student Submit
+    const handleStudentSubmit = async (e) => {
+        e.preventDefault();
+        if (!user || !db) return;
+
+        setSubmitStatus('submitting');
+        
+        const payload = {
+            metadata: { institution: "IBTRA", test_type: "Tajweed Quiz", total_marks: 16 },
+            student_info: {
+                name: formData.userName,
+                id: formData.userId,
+                branch: formData.userBranch,
+                date: formData.testDate
+            },
+            answers: {
+                q1: formData.q1, q2: formData.q2, q3: formData.q3, q4: formData.q4,
+                q5: formData.q5, q6: formData.q6, q7: formData.q7, q8: formData.q8
+            },
+            submitted_at: new Date().toISOString(),
+            uid: user.uid
+        };
+
+        try {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'submissions'), payload);
+            setSubmitStatus('success');
+            setFormData({
+                ...formData, q1: '', q2: '', q3: '', q4: '', q5: '', q6: '', q7: '', q8: ''
+            }); // Reset answers
+            
+            setTimeout(() => setSubmitStatus(null), 5000); // clear message after 5s
+        } catch (error) {
+            console.error("Error submitting document: ", error);
+            setSubmitStatus('error');
+        }
+    };
+
+    // Handle Teacher Saving Marks
+    const handleSaveMarks = async () => {
+        if (!user || !db || !gradingSubmission) return;
+
+        try {
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'submissions', gradingSubmission.id);
+            await updateDoc(docRef, {
+                marks: Number(currentMarks),
+                graded_at: new Date().toISOString()
+            });
+            setGradingSubmission(null);
+            setCurrentMarks('');
+        } catch (error) {
+            console.error("Error saving marks: ", error);
+        }
+    };
+
+    // Export to Excel (CSV with BOM for Unicode)
+    const handleExportExcel = () => {
+        const headers = ["Name", "ID", "Branch", "Date", "Marks", "Status", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8"];
+        const csvRows = [headers.join(",")];
+        
+        submissions.forEach(sub => {
+            const info = sub.student_info || {};
+            const ans = sub.answers || {};
+            const marks = sub.marks !== undefined ? sub.marks : "Not Graded";
+            const status = sub.marks !== undefined ? "Graded" : "Pending";
+            
+            const row = [
+                info.name, info.id, info.branch, info.date, marks, status,
+                ans.q1, ans.q2, ans.q3, ans.q4, ans.q5, ans.q6, ans.q7, ans.q8
+            ].map(field => `"${(field || '').toString().replace(/"/g, '""')}"`);
+            
+            csvRows.push(row.join(","));
+        });
+
+        const csvString = csvRows.join("\n");
+        // Add UTF-8 BOM so Excel reads Bengali text correctly
+        const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", "Tajweed_Class_Results.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // --- UI Components ---
+
+    // 1. Student Quiz View
+    const renderStudentView = () => (
+        <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden my-6">
+            <div className="bg-emerald-800 text-white p-6 text-center relative">
+                <h1 className="text-2xl md:text-3xl font-bold mb-2 font-serif">ইসলামী ব্যাংক ট্রেনিং অ্যান্ড রিসার্চ একাডেমি</h1>
+                <h2 className="text-xl md:text-2xl font-serif">তাজওয়ীদ পরীক্ষা</h2>
+                <p className="mt-2 text-emerald-200">সময়: ১৫ মিনিট | মোট নাম্বার: ১৬</p>
+            </div>
+
+            <div className="p-6 md:p-8">
+                {submitStatus === 'success' ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
+                        <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                        <h3 className="text-2xl font-bold text-green-800 mb-2">আলহামদুলিল্লাহ!</h3>
+                        <p className="text-green-700">আপনার উত্তর সফলভাবে জমা হয়েছে। শিক্ষকের পর্যালোচনার জন্য অপেক্ষা করুন।</p>
+                        <button onClick={() => setSubmitStatus(null)} className="mt-6 bg-emerald-600 text-white px-6 py-2 rounded-full hover:bg-emerald-700">
+                            নতুন পরীক্ষা দিন
+                        </button>
+                    </div>
+                ) : (
+                    <form onSubmit={handleStudentSubmit}>
+                        <div className="bg-emerald-50 p-4 md:p-6 rounded-lg mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 border border-emerald-100">
+                            <div>
+                                <label className="block text-gray-700 font-semibold mb-1">নাম:</label>
+                                <input type="text" name="userName" value={formData.userName} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                            <div>
+                                <label className="block text-gray-700 font-semibold mb-1">আইডি নং:</label>
+                                <input type="text" name="userId" value={formData.userId} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                            <div>
+                                <label className="block text-gray-700 font-semibold mb-1">শাখা:</label>
+                                <input type="text" name="userBranch" value={formData.userBranch} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                            <div>
+                                <label className="block text-gray-700 font-semibold mb-1">তারিখ:</label>
+                                <input type="date" name="testDate" value={formData.testDate} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            {[
+                                { id: 'q1', text: '১. লীনের হরফ কয়টি ও কী কী?' },
+                                { id: 'q2', text: '২. মাদ্দে মুনফাসিল ও মাদ্দে মুত্তাসিল-এর মধ্যে পার্থক্য কী?' },
+                                { id: 'q3', text: '৩. ওয়াজিব গুন্নাহ কাকে বলা হয়?' },
+                                { id: 'q4', text: '৪. নিচের আয়াতে আলিফ হরফকে কয় আলিফ পরিমাণ টেনে পড়তে হবে?', arabic: 'فَجَعَلَهُ غُثَاءً أَحْوَى' },
+                                { id: 'q5', text: '৫. নূন সাকিন বা তানওয়িন-এর পর কয়টি হরফ আসলে গুন্নাহ না করে পড়তে হয়? হরফগুলো কী কী?' },
+                                { id: 'q6', text: '৬. কলকলাহ (Qalqalah) শব্দের অর্থ কী? কলকলাহ-এর হরফ কয়টি?' },
+                                { id: 'q7', text: '৭. ইযহার (Izhar) কাকে বলে? ইযহারের হরফগুলো লিখুন।' },
+                                { id: 'q8', text: '৮. মীম সাকিন-এর পর \'মীম\' (م) আসলে কীভাবে পড়তে হয়?' }
+                            ].map(q => (
+                                <div key={q.id} className="p-4 bg-gray-50 border-l-4 border-emerald-600 rounded-r-lg shadow-sm">
+                                    <label className="block text-lg font-semibold text-gray-800 mb-2">{q.text}</label>
+                                    {q.arabic && <div className="text-2xl text-emerald-800 mb-3 text-right" style={{fontFamily: 'serif'}}>{q.arabic}</div>}
+                                    <textarea 
+                                        name={q.id} value={formData[q.id]} onChange={handleChange} rows="2" 
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500" placeholder="আপনার উত্তর এখানে লিখুন..."
+                                    ></textarea>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-8 text-center">
+                            <button disabled={submitStatus === 'submitting'} type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 transform hover:-translate-y-1 disabled:opacity-50">
+                                {submitStatus === 'submitting' ? 'জমা দেওয়া হচ্ছে...' : 'পরীক্ষা জমা দিন (Submit)'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </div>
+        </div>
+    );
+
+    // 2. Teacher Admin Dashboard
+    const renderTeacherView = () => {
+        if (gradingSubmission) {
+            return renderGradingView();
+        }
+
+        return (
+            <div className="max-w-6xl mx-auto my-6 bg-white rounded-xl shadow-lg overflow-hidden">
+                <div className="bg-slate-800 text-white p-6 flex justify-between items-center">
+                    <div>
+                        <h1 className="text-2xl font-bold font-serif flex items-center gap-2"><ShieldCheck /> শিক্ষক ড্যাশবোর্ড</h1>
+                        <p className="text-slate-300">সকল ছাত্রদের খাতা ও মার্কস পরিচালনা করুন</p>
+                    </div>
+                    <button onClick={handleExportExcel} className="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 shadow-sm transition">
+                        <Download size={20} /> Excel এ ডাউনলোড করুন
+                    </button>
+                </div>
+                
+                <div className="p-6 overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-100 text-slate-700">
+                                <th className="p-3 border-b">ছাত্রের নাম</th>
+                                <th className="p-3 border-b">আইডি নং</th>
+                                <th className="p-3 border-b">শাখা</th>
+                                <th className="p-3 border-b text-center">স্ট্যাটাস</th>
+                                <th className="p-3 border-b text-center">প্রাপ্ত নম্বর</th>
+                                <th className="p-3 border-b text-center">অ্যাকশন</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {submissions.length === 0 ? (
+                                <tr><td colSpan="6" className="text-center p-6 text-gray-500">এখনো কোনো ছাত্র খাতা জমা দেয়নি।</td></tr>
+                            ) : submissions.map(sub => (
+                                <tr key={sub.id} className="border-b hover:bg-slate-50 transition">
+                                    <td className="p-3 font-semibold text-gray-800">{sub.student_info.name}</td>
+                                    <td className="p-3 text-gray-600">{sub.student_info.id}</td>
+                                    <td className="p-3 text-gray-600">{sub.student_info.branch}</td>
+                                    <td className="p-3 text-center">
+                                        {sub.marks !== undefined 
+                                            ? <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold">Graded</span>
+                                            : <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full font-bold">Pending</span>
+                                        }
+                                    </td>
+                                    <td className="p-3 text-center font-bold text-emerald-700">{sub.marks !== undefined ? `${sub.marks}/16` : '-'}</td>
+                                    <td className="p-3 text-center">
+                                        <button 
+                                            onClick={() => { setGradingSubmission(sub); setCurrentMarks(sub.marks || ''); }}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded shadow text-sm"
+                                        >
+                                            খাতা দেখুন
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
+
+    // 3. Grading Individual View
+    const renderGradingView = () => {
+        const info = gradingSubmission.student_info;
+        const ans = gradingSubmission.answers;
+        const questions = [
+            '১. লীনের হরফ কয়টি ও কী কী?', '২. মাদ্দে মুনফাসিল ও মাদ্দে মুত্তাসিল-এর মধ্যে পার্থক্য কী?', '৩. ওয়াজিব গুন্নাহ কাকে বলা হয়?',
+            '৪. নিচের আয়াতে আলিফ হরফকে কয় আলিফ পরিমাণ টেনে পড়তে হবে?', '৫. নূন সাকিন বা তানওয়িন-এর পর কয়টি হরফ আসলে গুন্নাহ না করে পড়তে হয়?',
+            '৬. কলকলাহ (Qalqalah) শব্দের অর্থ কী?', '৭. ইযহার (Izhar) কাকে বলে?', '৮. মীম সাকিন-এর পর \'মীম\' (م) আসলে কীভাবে পড়তে হয়?'
+        ];
+
+        return (
+            <div className="max-w-4xl mx-auto my-6 bg-white rounded-xl shadow-lg overflow-hidden border border-slate-200">
+                <div className="bg-slate-100 p-4 flex items-center gap-4 border-b">
+                    <button onClick={() => setGradingSubmission(null)} className="text-slate-600 hover:text-slate-900 flex items-center font-semibold">
+                        <ChevronLeft size={20} /> পিছনে যান
+                    </button>
+                    <h2 className="text-xl font-bold flex-1 text-center text-slate-800">{info.name} এর খাতা মূল্যায়ন</h2>
+                </div>
+                
+                <div className="p-6">
+                    <div className="grid grid-cols-3 gap-4 mb-6 bg-blue-50 p-4 rounded-lg">
+                        <div><span className="text-slate-500 block text-sm">আইডি নং</span> <strong className="text-lg">{info.id}</strong></div>
+                        <div><span className="text-slate-500 block text-sm">শাখা</span> <strong className="text-lg">{info.branch}</strong></div>
+                        <div><span className="text-slate-500 block text-sm">তারিখ</span> <strong className="text-lg">{info.date}</strong></div>
+                    </div>
+
+                    <div className="space-y-6">
+                        {questions.map((q, idx) => (
+                            <div key={idx} className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                                <h4 className="font-bold text-slate-800 mb-2">{q}</h4>
+                                <div className="bg-white p-3 rounded border text-gray-700 min-h-[50px] whitespace-pre-wrap">
+                                    {ans[`q${idx + 1}`] || <span className="text-gray-400 italic">উত্তর দেওয়া হয়নি</span>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-8 bg-emerald-50 border border-emerald-200 p-6 rounded-lg flex items-center justify-between">
+                        <div>
+                            <label className="block text-emerald-900 font-bold mb-2">মোট নাম্বার প্রদান করুন (১৬ এর মধ্যে):</label>
+                            <input 
+                                type="number" min="0" max="16" value={currentMarks} 
+                                onChange={(e) => setCurrentMarks(e.target.value)}
+                                className="w-32 px-4 py-2 border-2 border-emerald-400 rounded-md font-bold text-xl focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                            />
+                        </div>
+                        <button onClick={handleSaveMarks} className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 px-8 rounded-lg shadow-lg">
+                            মার্কস সেভ করুন
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-100 font-sans pb-10">
+            {/* Top Navigation Mode Switcher */}
+            <nav className="bg-white shadow-md p-4 flex justify-center gap-4">
+                <button 
+                    onClick={() => setView('student')}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-full font-bold transition ${view === 'student' ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                >
+                    <BookOpen size={20} /> Student Portal (পরীক্ষা দিন)
+                </button>
+                <button 
+                    onClick={() => setView('teacher')}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-full font-bold transition ${view === 'teacher' ? 'bg-slate-800 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                >
+                    <User size={20} /> Teacher Portal (খাতা দেখুন)
+                </button>
+            </nav>
+
+            {/* Main Content Area */}
+            <div className="px-4">
+                {view === 'student' ? renderStudentView() : renderTeacherView()}
+            </div>
+        </div>
+    );
+}
