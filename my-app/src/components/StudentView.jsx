@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, ClipboardList, Clock, Award } from 'lucide-react';
 
 const QUESTIONS = [
   { id: 'q1', text: '১. লীনের হরফ কয়টি ও কী কী?' },
@@ -15,11 +15,16 @@ const QUESTIONS = [
 export default function StudentView({ formData, handleChange, handleSubmit, submitStatus, resetStatus }) {
   if (submitStatus === 'success') {
     return (
-      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden my-6 p-8 text-center">
-        <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-        <h3 className="text-2xl font-bold text-green-800 mb-2">আলহামদুলিল্লাহ!</h3>
-        <p className="text-green-700">আপনার উত্তর সফলভাবে জমা হয়েছে।</p>
-        <button onClick={resetStatus} className="mt-6 bg-emerald-600 text-white px-6 py-2 rounded-full hover:bg-emerald-700">
+      <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden my-12 p-10 text-center border border-emerald-100 animate-in zoom-in duration-500">
+        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle className="w-12 h-12 text-emerald-600" />
+        </div>
+        <h3 className="text-3xl font-black text-emerald-800 mb-4 font-serif">আলহামদুলিল্লাহ!</h3>
+        <p className="text-emerald-700 text-lg mb-8">আপনার উত্তর সফলভাবে জমা হয়েছে।</p>
+        <button 
+          onClick={resetStatus} 
+          className="bg-emerald-600 text-white px-10 py-4 rounded-full font-bold hover:bg-emerald-700 transition-all shadow-lg hover:shadow-emerald-200 active:scale-95"
+        >
           নতুন পরীক্ষা দিন
         </button>
       </div>
@@ -27,59 +32,95 @@ export default function StudentView({ formData, handleChange, handleSubmit, subm
   }
 
   return (
-    <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden my-6">
-      <div className="bg-emerald-800 text-white p-6 text-center">
-        <h1 className="text-2xl md:text-3xl font-bold mb-2 font-serif">তাজওয়ীদ পরীক্ষা</h1>
-        <p className="mt-2 text-emerald-200">সময়: ১৫ মিনিট | মোট নম্বর: ১৬</p>
+    <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden my-8 border border-slate-100">
+      {/* Premium Header */}
+      <div className="bg-emerald-900 text-white p-10 text-center relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+            <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-emerald-400 rounded-full blur-3xl"></div>
+        </div>
+        
+        <h1 className="text-3xl md:text-4xl font-black mb-4 font-serif tracking-tight">তাজওয়ীদ পরীক্ষা</h1>
+        
+        <div className="flex flex-wrap justify-center gap-4 mt-2">
+          <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md border border-white/10">
+            <Clock size={16} className="text-emerald-300" /> সময়: ১৫ মিনিট
+          </div>
+          <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md border border-white/10">
+            <Award size={16} className="text-emerald-300" /> মোট নম্বর: ১৬
+          </div>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 md:p-8">
-        <div className="bg-emerald-50 p-4 rounded-lg mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 border border-emerald-100">
-          {['userName', 'userId', 'userBranch', 'testDate'].map((field) => (
-            <div key={field}>
-              <label className="block text-gray-700 font-semibold mb-1 capitalize">{field.replace('user', '')}:</label>
+      <form onSubmit={handleSubmit} className="p-6 md:p-12 bg-slate-50/30">
+        {/* Student Info Card */}
+        <div className="bg-white p-8 rounded-2xl mb-12 grid grid-cols-1 md:grid-cols-2 gap-6 border border-emerald-100 shadow-sm relative">
+          {[
+            { id: 'userName', label: 'নাম' },
+            { id: 'userId', label: 'আইডি নং' },
+            { id: 'userBranch', label: 'শাখা (Branch)' },
+            { id: 'date', label: 'তারিখ (Date)' }
+          ].map((field) => (
+            <div key={field.id} className="space-y-1">
+              <label className="block text-slate-600 font-bold text-sm ml-1">{field.label}:</label>
               <input
-                type={field === 'testDate' ? 'date' : 'text'}
-                name={field}
-                value={formData[field]}
+                type={field.id === 'date' ? 'date' : 'text'}
+                name={field.id} // Fixed: Using field.id instead of the whole object
+                value={formData[field.id]}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium"
               />
             </div>
           ))}
         </div>
 
-        <div className="space-y-6">
+        {/* Questions Section */}
+        <div className="space-y-10">
           {QUESTIONS.map((q) => (
-            <div key={q.id} className="p-4 bg-gray-50 border-l-4 border-emerald-600 rounded-r-lg">
-              <label className="block text-lg font-semibold text-gray-800 mb-2">{q.text}</label>
-              
-                {q.arabic && (
-                    <div 
-                        dir="rtl" 
-                        className="font-arabic text-4xl text-emerald-800 mb-4 text-right leading-[2] antialiased"
-                    >
-                        {q.arabic}
-                    </div>
-                    )}
+            <div key={q.id} className="group relative bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300">
+              <label className="block text-xl font-bold text-slate-800 mb-6 pl-4 leading-relaxed">
+                {q.text}
+              </label>
+              <div 
+                  dir="rtl" 
+                  className="mb-6 text-emerald-900 text-right shadow-inner"
+                >
+                  [2]
+                </div>  
+              {q.arabic && (
+                <div 
+                  dir="rtl" 
+                  className="bg-emerald-50/50 p-8 rounded-2xl border-r-8 border-emerald-600 mb-6 text-4xl text-emerald-900 text-right font-arabic leading-[2.2] antialiased shadow-inner"
+                >
+                  {q.arabic}
+                </div>
+              )}
 
               <textarea
                 name={q.id}
                 value={formData[q.id]}
                 onChange={handleChange}
-                rows="2"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                rows="3"
+                className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all text-lg"
                 placeholder="আপনার উত্তর এখানে লিখুন..."
               />
             </div>
           ))}
         </div>
 
-        <div className="mt-8 text-center">
-          <button disabled={submitStatus === 'submitting'} type="submit" className="bg-emerald-700 text-white font-bold py-3 px-8 rounded-full shadow-lg disabled:opacity-50">
-            {submitStatus === 'submitting' ? 'জমা দেওয়া হচ্ছে...' : 'পরীক্ষা জমা দিন (Submit)'}
+        {/* Submit Button */}
+        <div className="mt-16 text-center">
+          <button 
+            disabled={submitStatus === 'submitting'} 
+            type="submit" 
+            className="group relative overflow-hidden bg-emerald-800 text-white font-black py-5 px-16 rounded-full shadow-2xl hover:bg-emerald-900 transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 text-xl tracking-wide uppercase"
+          >
+            <span className="relative z-10 flex items-center gap-3">
+              {submitStatus === 'submitting' ? 'জমা দেওয়া হচ্ছে...' : 'পরীক্ষা জমা দিন'}
+              <ClipboardList size={22} className="group-hover:rotate-12 transition-transform" />
+            </span>
           </button>
+          <p className="mt-4 text-slate-400 text-sm font-medium">একবার জমা দিলে আর পরিবর্তন করা যাবে না</p>
         </div>
       </form>
     </div>

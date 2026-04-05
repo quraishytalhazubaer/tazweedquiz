@@ -17,7 +17,7 @@ export default function TeacherView({ submissions, onExport, onGrade }) {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-100 text-slate-700">
-              <th className="p-3 border-b">ছাত্রের নাম</th>
+              <th className="p-3 border-b">নাম</th>
               <th className="p-3 border-b">আইডি নং</th>
               <th className="p-3 border-b">শাখা</th>
               <th className="p-3 border-b text-center">স্ট্যাটাস</th>
