@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@layer base {
+  @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
+}
+
+@layer utilities {
+  .font-arabic {
+    font-family: 'Amiri', serif;
+  }
+}
+
+
+@layer base {
+  @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Hind+Siliguri:wght@300;400;600;700&display=swap');
+  
+  body {
+    @apply bg-[#f8fafc] text-slate-900;
+    font-family: 'Hind Siliguri', sans-serif;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
+  }
+  
+  .font-arabic {
+    font-family: 'Amiri', serif;
+    @apply leading-[2.2] antialiased;
+  }
+
+  /* Custom Scrollbar for better UX */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+}
