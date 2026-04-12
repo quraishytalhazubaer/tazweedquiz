@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import GradingView from './components/GradingView';
-import Navbar from './components/navBar';
-import StudentView from './components/Studentview';
-import TeacherView from './components/Teacherview';
+import Navbar from './components/Navbar';
+import TeacherView from './components/TeacherView';
+import StudentView from './components/StudentView';
 import Login from './components/Login'; // Add this import
 
 export default function App() {
