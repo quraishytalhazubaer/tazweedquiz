@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import GradingView from './components/GradingView';
 import Navbar from './components/navBar';
 import StudentView from './components/Studentview';
@@ -60,6 +60,22 @@ export default function App() {
             setSubmitStatus('error');
         }
     };
+
+    useEffect(() => {
+        if (user?.role === 'teacher') {
+            const fetchSubmissions = async () => {
+                try {
+                    const response = await fetch(sheet_url);
+                    const data = await response.json();
+                    // Sheety returns { "sheet1": [...] }
+                    setSubmissions(data.sheet1 || []); 
+                } catch (error) {
+                    console.error("Error fetching data:", error);
+                }
+            };
+            fetchSubmissions();
+        }
+    }, [user]);
 
     const handleSaveMarks = () => {
         console.log("Save marks for:", gradingSubmission, currentMarks);

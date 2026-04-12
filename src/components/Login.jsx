@@ -85,7 +85,7 @@ export default function Login({ onLogin }) {
                   : 'text-slate-500 hover:text-slate-800 scale-95'
               }`}
             >
-              <User size={20} /> ছাত্র (Student)
+              <User size={20} /> পরীক্ষার্থী (Examinee)
             </button>
             <button
               type="button"

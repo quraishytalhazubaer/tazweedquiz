@@ -5,11 +5,8 @@ const QUESTIONS = [
   { id: 'q1', text: '১. লীনের হরফ কয়টি ও কী কী?' },
   { id: 'q2', text: '২. মাদ্দে মুনফাসিল ও মাদ্দে মুত্তাসিল-এর মধ্যে পার্থক্য কী?' },
   { id: 'q3', text: '৩. ওয়াজিব গুন্নাহ কাকে বলা হয়?' },
-  { id: 'q4', text: '৪. নিচের আয়াতে আলিফ হরফকে কয় আলিফ পরিমাণ টেনে পড়তে হবে?', arabic: 'فَجَعَلَهُ غُثَاءً أَحْوَٰ' },
+  { id: 'q4', text: '৪. নিচের আয়াতে হরফ ث কে কয় আলিফ পরিমাণ টেনে পড়তে হবে?', arabic: 'فَجَعَلَهُ غُثَاءً أَحْوَٰ' },
   { id: 'q5', text: '৫. নূন সাকিন বা তানওয়িন-এর পর কয়টি হরফ আসলে গুন্নাহ না করে পড়তে হয়? হরফগুলো কী কী?' },
-  { id: 'q6', text: '৬. কলকলাহ (Qalqalah) শব্দের অর্থ কী? কলকলাহ-এর হরফ কয়টি?' },
-  { id: 'q7', text: '৭. ইযহার (Izhar) কাকে বলে? ইযহারের হরফগুলো লিখুন।' },
-  { id: 'q8', text: '৮. মীম সাকিন-এর পর \'মীম\' (م) আসলে কীভাবে পড়তে হয়?' }
 ];
 
 export default function StudentView({ formData, handleChange, handleSubmit, submitStatus, resetStatus }) {
@@ -21,12 +18,12 @@ export default function StudentView({ formData, handleChange, handleSubmit, subm
         </div>
         <h3 className="text-3xl font-black text-emerald-800 mb-4 font-serif">আলহামদুলিল্লাহ!</h3>
         <p className="text-emerald-700 text-lg mb-8">আপনার উত্তর সফলভাবে জমা হয়েছে।</p>
-        <button 
+        {/* <button 
           onClick={resetStatus} 
           className="bg-emerald-600 text-white px-10 py-4 rounded-full font-bold hover:bg-emerald-700 transition-all shadow-lg hover:shadow-emerald-200 active:scale-95"
         >
           নতুন পরীক্ষা দিন
-        </button>
+        </button> */}
       </div>
     );
   }
