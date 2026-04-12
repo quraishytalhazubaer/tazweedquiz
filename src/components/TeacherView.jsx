@@ -25,6 +25,7 @@ export default function TeacherView({ submissions = [], onExport, onGrade }) {
               <th className="p-3 border-b">নাম</th>
               <th className="p-3 border-b">আইডি নং</th>
               <th className="p-3 border-b">শাখা</th>
+              <th className="p-3 border-b">জমার সময়</th>
               <th className="p-3 border-b text-center">স্ট্যাটাস</th>
               <th className="p-3 border-b text-center">প্রাপ্ত নম্বর</th>
               <th className="p-3 border-b text-center">অ্যাকশন</th>
@@ -43,6 +44,7 @@ export default function TeacherView({ submissions = [], onExport, onGrade }) {
                   <td className="p-3 font-semibold">{sub.userName || 'N/A'}</td>
                   <td className="p-3">{sub.userId || 'N/A'}</td>
                   <td className="p-3">{sub.userBranch || 'N/A'}</td>
+                  <td className="p-3 text-sm">{sub.timestamp || 'N/A'}</td>
                   
                   <td className="p-3 text-center">
                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${sub.marks ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>

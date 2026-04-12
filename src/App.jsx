@@ -43,12 +43,24 @@ export default function App() {
         console.log("Student submitted:", formData);
         setSubmitStatus('submitting');
 
+        // Capture the exact moment of submission
+        const now = new Date();
+        const timestamp = now.toLocaleString('bn-BD'); // Formats to Bengali locale, or use toISOString()
+
+
+
+        const dataToSubmit = {
+            ...formData,
+            timestamp: timestamp // Ensure your Google Sheet has a 'timestamp' column
+        };
+
+
         try {
             const response = await fetch(sheet_url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sheet1: formData
+                    sheet1: dataToSubmit
                 })
             });
 
