@@ -45,7 +45,7 @@ export default function App() {
 
         // Capture the exact moment of submission
         const now = new Date();
-        const timestamp = now.toLocaleString('bn-BD'); // Formats to Bengali locale, or use toISOString()
+        const timestamp = now.toDateString() + ' ' + now.toLocaleTimeString();
 
 
 
