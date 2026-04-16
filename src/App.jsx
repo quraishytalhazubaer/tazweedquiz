@@ -3,7 +3,7 @@ import GradingView from './components/GradingView';
 import Navbar from './components/Navbar';
 import TeacherView from './components/TeacherView';
 import StudentView from './components/StudentView';
-import Login from './components/Login'; // Add this import
+import Login from './components/Login';
 
 export default function App() {
     // 1. Authentication State (null = not logged in)
@@ -89,10 +89,51 @@ export default function App() {
         }
     }, [user]);
 
-    const handleSaveMarks = () => {
-        console.log("Save marks for:", gradingSubmission, currentMarks);
-        // Add logic to update the submissions array here
-        setGradingSubmission(null);
+    // 1. Update the handleSaveMarks to actually send data to Sheety
+    const handleSaveMarks = async () => {
+        if (!gradingSubmission) return;
+
+        // 1. Identify the specific row to update using its ID
+        const rowId = gradingSubmission.id;
+        const updateUrl = `${sheet_url}/${rowId}`;
+
+        try {
+            const response = await fetch(updateUrl, {
+                method: 'PUT', // PUT is used for updating existing data
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sheet1: {
+                        marks: currentMarks // This must match the header name in your Google Sheet
+                    }
+                })
+            });
+
+            if (response.ok) {
+                console.log("Marks saved successfully!");
+                
+                // 2. Update the local submissions list so the table updates immediately
+                setSubmissions(submissions.map(sub => 
+                    sub.id === rowId ? { ...sub, marks: currentMarks } : sub
+                ));
+
+                // 3. Close the grading view
+                setGradingSubmission(null);
+                setCurrentMarks('');
+            } else {
+                const error = await response.json();
+                console.error("Sheety error:", error);
+                alert("Could not save marks. Check console for details.");
+            }
+        } catch (error) {
+            console.error("Network error:", error);
+            alert("Failed to connect to the server.");
+        }
+    };
+
+    // 2. When opening the grading view, pre-fill the marks if they exist
+    const handleOpenGrading = (submission) => {
+        setGradingSubmission(submission);
+        setCurrentMarks(submission.marks || ''); 
     };
 
     // --- Conditional Rendering ---
@@ -120,8 +161,9 @@ export default function App() {
                 {user?.role === 'teacher' && !gradingSubmission && (
                     <TeacherView
                         submissions={submissions}
-                        setGradingSubmission={setGradingSubmission}
-                        handleExport={() => console.log("Exporting...")}
+                        onGrade={handleOpenGrading} // Use the new wrapper function
+                        // setGradingSubmission={setGradingSubmission}
+                        onExport={() => console.log("Exporting...")}
                     />
                 )}
 
