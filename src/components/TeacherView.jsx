@@ -53,7 +53,7 @@ export default function TeacherView({ submissions = [], onExport, onGrade }) {
                   </td>
                   
                   <td className="p-3 text-center font-bold text-emerald-700">
-                    {sub.marks ? `${sub.marks}/16` : '-'}
+                    {sub.marks ? `${sub.marks}/10` : '-'}
                   </td>
                   
                   <td className="p-3 text-center">

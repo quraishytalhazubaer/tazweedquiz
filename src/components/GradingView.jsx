@@ -9,9 +9,6 @@ export default function GradingView({ submission, currentMarks, setCurrentMarks,
         { id: 'q3', text: '৩. ওয়াজিব গুন্নাহ কাকে বলা হয়?' },
         { id: 'q4', text: '৪. নিচের আয়াতে আলিফ হরফকে কয় আলিফ পরিমাণ টেনে পড়তে হবে?', arabic: 'فَجَعَلَهُ غُثَاءً أَحْوَٰ' },
         { id: 'q5', text: '৫. নূন সাকিন বা তানওয়িন-এর পর কয়টি হরফ আসলে গুন্নাহ না করে পড়তে হয়? হরফগুলো কী কী?' },
-        { id: 'q6', text: '৬. কলকলাহ (Qalqalah) শব্দের অর্থ কী? কলকলাহ-এর হরফ কয়টি?' },
-        { id: 'q7', text: '৭. ইযহার (Izhar) কাকে বলে? ইযহারের হরফগুলো লিখুন।' },
-        { id: 'q8', text: '৮. মীম সাকিন-এর পর \'মীম\' (م) আসলে কীভাবে পড়তে হয়?' }
     ];
 
     return (
@@ -49,7 +46,7 @@ export default function GradingView({ submission, currentMarks, setCurrentMarks,
                 {/* Grading Footer */}
                 <div className="border-t pt-6 flex items-center justify-between bg-white sticky bottom-0 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
                     <div className="flex items-center gap-4">
-                        <label className="font-bold text-lg">প্রাপ্ত নম্বর (১৬ এর মধ্যে):</label>
+                        <label className="font-bold text-lg">প্রাপ্ত নম্বর (১০ এর মধ্যে):</label>
                         <input
                             type="number"
                             max="16"
