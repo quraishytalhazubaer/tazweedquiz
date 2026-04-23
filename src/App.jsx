@@ -136,6 +136,36 @@ export default function App() {
         setCurrentMarks(submission.marks || ''); 
     };
 
+    // ✅ এই ফাংশনটি এখন সঠিকভাবে CSV তৈরি করবে
+    const handleExportExcel = () => {
+        if (submissions.length === 0) {
+            alert("ডাউনলোড করার মতো কোনো ডেটা নেই।");
+            return;
+        }
+
+        const headers = ["Name", "Student ID", "Branch", "Date", "Marks", "Q1", "Q2", "Q3", "Q4", "Q5"];
+        const csvRows = [headers.join(",")];
+        
+        submissions.forEach(sub => {
+            const row = [
+                sub.userName, sub.userId, sub.userBranch, sub.date, sub.marks,
+                sub.q1, sub.q2, sub.q3, sub.q4, sub.q5, sub.q6, sub.q7, sub.q8
+            ].map(field => `"${(field || '').toString().replace(/"/g, '""')}"`);
+            
+            csvRows.push(row.join(","));
+        });
+
+        const csvString = csvRows.join("\n");
+        const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", "Tajweed_Results.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     // --- Conditional Rendering ---
     return (
         <div className="min-h-screen bg-gray-100">
@@ -163,7 +193,7 @@ export default function App() {
                         submissions={submissions}
                         onGrade={handleOpenGrading} // Use the new wrapper function
                         // setGradingSubmission={setGradingSubmission}
-                        onExport={() => console.log("Exporting...")}
+                        onExport={handleExportExcel}
                     />
                 )}
 
