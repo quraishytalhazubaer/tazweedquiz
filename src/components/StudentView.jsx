@@ -43,7 +43,7 @@ export default function StudentView({ formData, handleChange, handleSubmit, subm
             <Clock size={16} className="text-emerald-300" /> সময়: ১৫ মিনিট
           </div>
           <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md border border-white/10">
-            <Award size={16} className="text-emerald-300" /> মোট নম্বর: ১৬
+            <Award size={16} className="text-emerald-300" /> মোট নম্বর: ১০
           </div>
         </div>
       </div>

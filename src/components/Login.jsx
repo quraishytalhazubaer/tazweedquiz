@@ -15,8 +15,8 @@ export default function Login({ onLogin }) {
     // --- Modern Security Simulation ---
     // (Ensure you use a proper backend for authentication later)
     if (isTeacher) {
-      if (password === 'qtZ2012$') { // Example Password
-        onLogin({ role: 'teacher', name: 'Zubaer (Admin)', branch: 'Cumilla' });
+      if (password === 'a') { // Example Password
+        onLogin({ role: 'teacher', name: 'Talha Zubaer (Admin)', branch: 'IBTRA Head Office' });
       } else {
         setError('ভুল পাসওয়ার্ড! আবার চেষ্টা করুন।');
       }
