@@ -126,7 +126,7 @@ const Login = ({ onLogin }) => {
                 {/* Full Name Input */}
                 <div className="space-y-2">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
-                      Teacher Identity
+                      {isTeacher ? 'Teacher Identity' : 'Participant Identity'}
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-300 group-focus-within:text-emerald-600 transition-all">
