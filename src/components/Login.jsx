@@ -134,7 +134,7 @@ const Login = ({ onLogin }) => {
                       <User size={18} strokeWidth={3} />
                     </div>
                     <input
-                      {isTeacher ? required}
+                      {isTeacher ? 'required'}
                       type="text"
                       placeholder="আপনার নাম"
                       value={name}
