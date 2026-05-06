@@ -368,6 +368,7 @@ export default function App() {
                 {/* 2. Student View */}
                 {user?.role === 'student' && (
                     <StudentView
+                        user={user}
                         formData={formData}
                         handleChange={handleChange}
                         handleSubmit={handleStudentSubmit}
