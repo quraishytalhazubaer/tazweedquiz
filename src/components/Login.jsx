@@ -124,7 +124,6 @@ const Login = ({ onLogin }) => {
 
               <form onSubmit={handleSubmit} className="space-y-7">
                 {/* Full Name Input */}
-                {isTeacher && (
                 <div className="space-y-2">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
                       Teacher Identity
@@ -134,7 +133,7 @@ const Login = ({ onLogin }) => {
                       <User size={18} strokeWidth={3} />
                     </div>
                     <input
-                      {isTeacher ? 'required': ''}
+                      required
                       type="text"
                       placeholder="আপনার নাম"
                       value={name}
@@ -142,7 +141,7 @@ const Login = ({ onLogin }) => {
                       className="w-full pl-13 pr-6 py-4.5 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-800 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-emerald-500/20 focus:ring-4 focus:ring-emerald-500/5 transition-all text-base font-bold"
                     />
                   </div>
-                </div>)}
+                </div>
 
                 {/* Password/Code Input */}
                 <div className="space-y-2">
