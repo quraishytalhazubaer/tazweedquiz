@@ -69,7 +69,7 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#1B4D1A] font-sans selection:bg-emerald-100 overflow-hidden relative">
+    <div className="min-h-screen w-screen flex flex-col lg:flex-row bg-[#1B4D1A] font-sans selection:bg-emerald-100 overflow-hidden relative">
       
       {/* Background Textures */}
       <div className="absolute inset-0 pointer-events-none opacity-20">
@@ -84,7 +84,7 @@ const Login = ({ onLogin }) => {
       </div>
 
       {/* Refined White Login Panel Section */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 relative z-10 bg-emerald-950/20 lg:bg-transparent">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 relative z-10 bg-transparent">
         <div className="w-full max-w-[460px] animate-in fade-in zoom-in-95 duration-700 delay-200">
           
           <div className="bg-white rounded-[2.5rem] shadow-[0_40px_80px_-15px_rgba(0,0,0,0.4)] border border-white/10 overflow-hidden">
