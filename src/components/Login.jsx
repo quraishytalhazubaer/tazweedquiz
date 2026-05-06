@@ -89,9 +89,6 @@ const Login = ({ onLogin }) => {
           
           <div className="bg-white rounded-[2.5rem] shadow-[0_40px_80px_-15px_rgba(0,0,0,0.4)] border border-white/10 overflow-hidden">
             
-            {/* Contextual Color Strip */}
-            <div className={`h-2.5 w-full transition-colors duration-500 ${isTeacher ? 'bg-slate-800' : 'bg-[#059669]'}`} />
-
             <div className="p-6 md:p-10 lg:p-16">
               {/* Better Positioned Login Header */}
               <div className="mb-10 text-center">
