@@ -8,7 +8,7 @@ import GradingView from './components/GradingView';
 import SettingsModal from './components/SettingsModal';
 import { QUESTIONS } from './constants/questions';
 
-const CONFIG_SHEET_URL = 'https://api.sheety.co/40e2e696212d0377f7b46833bdd3b4f1/tazweedTest/sheet2';
+const CONFIG_SHEET_URL = 'https://api.sheety.co/a1f0b0852da8c6a3b51fbae86ae6894b/quranClassEval/sheet2';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -47,12 +47,10 @@ export default function App() {
 
       if (configSheet.length > 0) {
         const config = configSheet[0];
-        setIsExamActive(
-          config.isExamActive === true || 
-          config.isExamActive === "TRUE" || 
-          config.isExamActive === 1 || 
-          config.isExamActive === "true"
-        );
+        const isActive =
+          String(config.isExamActive).toLowerCase() === 'true' ||
+          Number(config.isExamActive) === 1;
+        setIsExamActive(isActive);
         setSubmissionUrl(config.submissionUrl || '');
         setSettingsUrl(config.submissionUrl || '');
         setConfigRowId(config.id);
@@ -78,7 +76,14 @@ export default function App() {
       const response = await fetch(`${CONFIG_SHEET_URL}/${configRowId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheet2: newConfig })
+        body: JSON.stringify({
+          sheet2: {
+            isExamActive:
+              newConfig.isExamActive ?? isExamActive,
+            submissionUrl:
+              newConfig.submissionUrl ?? submissionUrl
+          }
+        })
       });
 
       if (response.ok) {
@@ -101,7 +106,7 @@ export default function App() {
       const response = await fetch(submissionUrl);
       if (!response.ok) throw new Error("Failed to load submissions");
       const data = await response.json();
-      setSubmissions(data.sheet1 || []);
+      setSubmissions(data.sheet3 || []);
     } catch (err) {
       console.error(err);
       // Don't show alert on every refresh
@@ -133,7 +138,7 @@ export default function App() {
       const response = await fetch(submissionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheet1: dataToSubmit })
+        body: JSON.stringify({ sheet3: dataToSubmit })
       });
       if (response.ok) {
         setSubmitStatus('success');
@@ -146,78 +151,68 @@ export default function App() {
     }
   };
 
-  const handleSaveMarks = async (marks) => {
+  // const handleSaveMarks = async () => {
+  //   if (!gradingSubmission || !submissionUrl) return;
+  //   try {
+  //     await fetch(`${submissionUrl}/${gradingSubmission.id}`, {
+  //       method: 'PUT',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({ sheet3: { marks } })
+  //     });
+  //     setSubmissions(prev => prev.map(s => s.id === gradingSubmission.id ? { ...s, marks } : s));
+  //     setGradingSubmission(null);
+  //     alert("✅ Marks saved successfully!");
+  //   } catch (error) {
+  //     alert("Failed to save marks");
+  //   }
+  // };
+
+  const handleSaveMarks = async () => {
     if (!gradingSubmission || !submissionUrl) return;
+
     try {
-      await fetch(`${submissionUrl}/${gradingSubmission.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheet1: { marks } })
-      });
-      setSubmissions(prev => prev.map(s => s.id === gradingSubmission.id ? { ...s, marks } : s));
+
+      const response = await fetch(
+        `${submissionUrl}/${gradingSubmission.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            sheet3: {
+              marks: currentMarks
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.text();
+        console.log(err);
+        throw new Error("Failed");
+      }
+
+      setSubmissions(prev =>
+        prev.map(s =>
+          s.id === gradingSubmission.id
+            ? {
+                ...s,
+                marks: currentMarks
+              }
+            : s
+        )
+      );
+
       setGradingSubmission(null);
+
       alert("✅ Marks saved successfully!");
+
     } catch (error) {
+      console.error(error);
       alert("Failed to save marks");
     }
   };
-
-      useEffect(() => {
-        if (user?.role === 'teacher') {
-            const fetchSubmissions = async () => {
-                try {
-                    const response = await fetch(submissionUrl);
-                    const data = await response.json();
-                    // Sheety returns { "sheet1": [...] }
-                    setSubmissions(data.sheet1 || []); 
-                } catch (error) {
-                    console.error("Error fetching data:", error);
-                }
-            };
-            fetchSubmissions();
-        }
-    }, [user]);
-
-    // // 1. Update the handleSaveMarks to actually send data to Sheety
-    // const handleSaveMarks = async () => {
-    //     if (!gradingSubmission) return;
-
-    //     // 1. Identify the specific row to update using its ID
-    //     const rowId = gradingSubmission.id;
-    //     const updateUrl = `${sheet_url}/${rowId}`;
-
-    //     try {
-    //         const response = await fetch(updateUrl, {
-    //             method: 'PUT', // PUT is used for updating existing data
-    //             headers: { 'Content-Type': 'application/json' },
-    //             body: JSON.stringify({
-    //                 sheet1: {
-    //                     marks: currentMarks // This must match the header name in your Google Sheet
-    //                 }
-    //             })
-    //         });
-
-    //         if (response.ok) {
-    //             console.log("Marks saved successfully!");
-                
-    //             // 2. Update the local submissions list so the table updates immediately
-    //             setSubmissions(submissions.map(sub => 
-    //                 sub.id === rowId ? { ...sub, marks: currentMarks } : sub
-    //             ));
-
-    //             // 3. Close the grading view
-    //             setGradingSubmission(null);
-    //             setCurrentMarks('');
-    //         } else {
-    //             const error = await response.json();
-    //             console.error("Sheety error:", error);
-    //             alert("Could not save marks. Check console for details.");
-    //         }
-    //     } catch (error) {
-    //         console.error("Network error:", error);
-    //         alert("Failed to connect to the server.");
-    //     }
-    // };
 
     // 2. When opening the grading view, pre-fill the marks if they exist
     const handleOpenGrading = (submission) => {
@@ -440,7 +435,7 @@ export default function App() {
         {user?.role === 'student' && (
           <StudentView
             formData={formData}
-            handleChange={(e) => setFormData({ ...formData, [e.target.name]: e.target.value })}
+            handleChange={handleChange}
             handleSubmit={handleStudentSubmit}
             isExamActive={isExamActive}
             submitStatus={submitStatus}
@@ -453,7 +448,7 @@ export default function App() {
           <TeacherView
             submissions={submissions}
             selectedIds={selectedIds}
-            onToggleSelect={(id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])}
+            onToggleSelect={toggleSelect}
             onSelectAll={() => setSelectedIds(selectedIds.length === submissions.length ? [] : submissions.map(s => s.id))}
             onGrade={(sub) => setGradingSubmission(sub)}
             handleExamToggle={() => updateConfig({ isExamActive: !isExamActive })}
