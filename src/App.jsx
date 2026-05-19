@@ -135,7 +135,7 @@ export default function App() {
     const dataToSubmit = { ...formData, timestamp: new Date().toLocaleString('bn-BD') };
 
     try {
-      const response = await fetch(submissionUrl, {
+      const response = await fetch("https://api.sheety.co/3f819e75aee76a9b0a8a7ab29e8f34c8/quranClassTestMay26/sheet1", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sheet1: dataToSubmit })
