@@ -31,7 +31,7 @@ export default function App() {
   const [formData, setFormData] = useState({
     userName: '', userId: '', userBranch: '',
     date: new Date().toISOString().split('T')[0],
-    q1: '', q2: '', q3: '', q4: '', q5: ''
+    q1: '', q2: '', q3: '', q4: '', q5: '', q6: '', q7: '', q8: '', q9: '', q10: '', q11: '', q12: '', q13: '', q14: '', q15: '', q16: '', q17: '', q18: '', q19: '', q20: ''
   });
 
   // ==================== FETCH CONFIG ====================
@@ -293,13 +293,14 @@ export default function App() {
             return;
         }
 
-        const headers = ["Name", "Student ID", "Branch", "Date", "Marks", "Q1", "Q2", "Q3", "Q4", "Q5"];
+        const headers = ["Name", "Student ID", "Branch", "Date", "Marks", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14", "Q15", "Q16", "Q17", "Q18", "Q19", "Q20"];
         const csvRows = [headers.join(",")];
         
         submissions.forEach(sub => {
             const row = [
                 sub.userName, sub.userId, sub.userBranch, sub.date, sub.marks,
-                sub.q1, sub.q2, sub.q3, sub.q4, sub.q5
+                sub.q1, sub.q2, sub.q3, sub.q4, sub.q5, sub.q6, sub.q7, sub.q8, sub.q9, sub.q10,
+                sub.q11, sub.q12, sub.q13, sub.q14, sub.q15, sub.q16, sub.q17, sub.q18, sub.q19, sub.q20
             ].map(field => `"${(field || '').toString().replace(/"/g, '""')}"`);
             
             csvRows.push(row.join(","));
