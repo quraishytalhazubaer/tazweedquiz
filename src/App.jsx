@@ -8,7 +8,7 @@ import GradingView from './components/GradingView';
 import SettingsModal from './components/SettingsModal';
 import QUESTIONS from './constants/questions';
 
-const CONFIG_SHEET_URL = 'https://api.sheety.co/3f819e75aee76a9b0a8a7ab29e8f34c8/quranClassTestMay26/sheet2';
+const CONFIG_SHEET_URL = 'https://api.sheety.co/6e4425cb77a3ef2807474001bcf68120/qcExam/sheet2';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -135,7 +135,7 @@ export default function App() {
     const dataToSubmit = { ...formData, timestamp: new Date().toLocaleString('bn-BD') };
 
     try {
-      const response = await fetch("https://api.sheety.co/3f819e75aee76a9b0a8a7ab29e8f34c8/quranClassTestMay26/sheet1", {
+      const response = await fetch("https://api.sheety.co/6e4425cb77a3ef2807474001bcf68120/qcExam/sheet1", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sheet1: dataToSubmit })
