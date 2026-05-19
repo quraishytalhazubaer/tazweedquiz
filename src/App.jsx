@@ -6,7 +6,7 @@ import TeacherView from './components/TeacherView';
 import StudentView from './components/StudentView';
 import GradingView from './components/GradingView';
 import SettingsModal from './components/SettingsModal';
-import { QUESTIONS } from './constants/questions';
+import QUESTIONS from './constants/questions';
 
 const CONFIG_SHEET_URL = 'https://api.sheety.co/3f819e75aee76a9b0a8a7ab29e8f34c8/quranClassTestMay26/sheet2';
 

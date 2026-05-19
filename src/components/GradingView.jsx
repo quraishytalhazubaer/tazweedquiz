@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { ChevronLeft, Save } from 'lucide-react';
-import { QUESTIONS } from '../constants/questions';
+import QUESTIONS from '../constants/questions';
 
 export default function GradingView({
   submission,

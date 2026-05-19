@@ -1,5 +1,5 @@
 import { ClipboardCheck, Clock, RefreshCw, CalendarDays } from 'lucide-react';
-import { QUESTIONS } from '../constants/questions';
+import QUESTIONS from '../constants/questions';
 
 const StudentView = ({
   formData,

@@ -1,4 +1,4 @@
-[
+const QUESTIONS = [
     {
     "question": "১. ‘মদ্দ’ (Madd) শব্দের অর্থ কী এবং মদ্দের মূল হরফ কয়টি?",
     "options": [
@@ -200,3 +200,4 @@
     "correctAnswer": "মদ্দে আরযী"
   }
 ]
+export default QUESTIONS; 
