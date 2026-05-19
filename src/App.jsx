@@ -8,7 +8,7 @@ import GradingView from './components/GradingView';
 import SettingsModal from './components/SettingsModal';
 import { QUESTIONS } from './constants/questions';
 
-const CONFIG_SHEET_URL = 'https://api.sheety.co/a1f0b0852da8c6a3b51fbae86ae6894b/quranClassEval/sheet2';
+const CONFIG_SHEET_URL = 'https://api.sheety.co/3f819e75aee76a9b0a8a7ab29e8f34c8/quranClassTestMay26/sheet2';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -106,7 +106,7 @@ export default function App() {
       const response = await fetch(submissionUrl);
       if (!response.ok) throw new Error("Failed to load submissions");
       const data = await response.json();
-      setSubmissions(data.sheet3 || []);
+      setSubmissions(data.sheet1 || []);
     } catch (err) {
       console.error(err);
       // Don't show alert on every refresh
@@ -138,7 +138,7 @@ export default function App() {
       const response = await fetch(submissionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheet3: dataToSubmit })
+        body: JSON.stringify({ sheet1: dataToSubmit })
       });
       if (response.ok) {
         setSubmitStatus('success');
@@ -157,7 +157,7 @@ export default function App() {
   //     await fetch(`${submissionUrl}/${gradingSubmission.id}`, {
   //       method: 'PUT',
   //       headers: { 'Content-Type': 'application/json' },
-  //       body: JSON.stringify({ sheet3: { marks } })
+  //       body: JSON.stringify({ sheet1: { marks } })
   //     });
   //     setSubmissions(prev => prev.map(s => s.id === gradingSubmission.id ? { ...s, marks } : s));
   //     setGradingSubmission(null);
@@ -180,7 +180,7 @@ export default function App() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            sheet3: {
+            sheet1: {
               marks: currentMarks
             }
           })
