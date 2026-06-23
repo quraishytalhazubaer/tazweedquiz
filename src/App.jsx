@@ -15,6 +15,7 @@ export default function App() {
     const [submissions, setSubmissions] = useState([]);
 
     const [selectedIds, setSelectedIds] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
 
     const QUESTIONS = [
         "১. লীনের হরফ কয়টি ও কী কী?",
