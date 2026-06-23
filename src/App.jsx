@@ -48,7 +48,7 @@ export default function App() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    let sheet_url = 'https://api.sheety.co/a1f0b0852da8c6a3b51fbae86ae6894b/quranClassEval/sheet1';
+    let sheet_url = 'https://api.sheety.co/1dba8e2864ff5c67b351cd9764124aa5/quranClassEvaluation/sheet1';
 
     const fetchSubmissions = async () => {
         setIsLoading(true);
