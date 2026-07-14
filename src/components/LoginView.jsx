@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { AlertCircle, BookOpen, ChevronRight, Lock, ShieldCheck, User } from 'lucide-react'
 
+import logo from '../assets/ibbplc.jpg';
+
 const OfficialIBBLogo = () => {
   return (
     <div className="flex flex-col items-center text-center">
       <div className="mb-6 transform hover:scale-105 transition-transform duration-300">
-        <div className="w-24 h-24 md:w-32 md:h-32 bg-white rounded-3xl flex items-center justify-center shadow-2xl border-4 border-emerald-500/20">
-          <svg className="w-16 h-16 text-[#1B4D1A]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-          </svg>
-        </div>
+          <img 
+                src={logo}
+                className="w-24 md:w-32 lg:w-40 h-auto"
+                alt="Islami Bank Logo" 
+            />
       </div>
       <div className="space-y-2 px-4">
         <h2 className="text-white text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-tight drop-shadow-md">
@@ -66,7 +68,7 @@ function LoginView({ onLogin, teacherPassword, studentAccessCode }) {
   }
 
   return (
-    <div className="fixed inset-0 w-screen h-screen flex flex-col lg:flex-row bg-[#1B4D1A] font-sans selection:bg-emerald-100 overflow-y-auto lg:overflow-hidden z-50">
+    <div className="fixed inset-0 w-screen h-screen flex flex-col lg:flex-row bg-[#1a4517] font-sans selection:bg-emerald-100 overflow-y-auto lg:overflow-hidden z-50">
       <div className="absolute inset-0 pointer-events-none opacity-25">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_30%,#059669_0%,transparent_60%)]" />
       </div>
