@@ -84,33 +84,33 @@ function StudentTerminal({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase block">পূর্ণ নাম (বাংলায়)</label>
+                <label className="text-xs font-bold text-slate-700 uppercase block">Full Name</label>
                 <input
                   required
                   type="text"
-                  placeholder="মুহাম্মদ আব্দুল্লাহ"
+                  placeholder="Muhammad Abdullah"
                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-600 focus:outline-none transition"
                   value={formData.userName}
                   onChange={(e) => onChange('userName', e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase block">রোল / স্টুডেন্ট আইডি</label>
+                <label className="text-xs font-bold text-slate-700 uppercase block">Employee ID</label>
                 <input
                   required
                   type="text"
-                  placeholder="ID-5012"
+                  placeholder="5012"
                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-600 focus:outline-none transition"
                   value={formData.userId}
                   onChange={(e) => onChange('userId', e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase block">শাখা (Branch)</label>
+                <label className="text-xs font-bold text-slate-700 uppercase block">Branch</label>
                 <input
                   required
                   type="text"
-                  placeholder="প্রধান কার্যালয়"
+                  placeholder="Head Office"
                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-600 focus:outline-none transition"
                   value={formData.userBranch}
                   onChange={(e) => onChange('userBranch', e.target.value)}
