@@ -43,7 +43,7 @@ import { handleExportExcel, generateSummaryPDF, generateIndividualPDF } from './
 
 
 // Connection parameters and credentials
-const DEFAULT_SHEETY_URL = 'https://api.sheety.co/40e2e696212d0377f7b46833bdd3b4f1/tazweedTestJuly26/sheet1';
+const DEFAULT_SHEETY_URL = 'https://api.sheety.co/1dba8e2864ff5c67b351cd9764124aa5/qcExam15July26/sheet1';
 const TEACHER_PASSWORD = "admin786";
 const STUDENT_ACCESS_CODE = "ibtra2024";
 
