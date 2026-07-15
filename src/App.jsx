@@ -88,6 +88,17 @@ export default function App() {
     userBranch: '',
     ...Array.from({ length: 20 }).reduce((acc, _, i) => ({ ...acc, [`q${i + 1}`]: '' }), {})
   });
+
+  useEffect(() => {
+
+    const saved = localStorage.getItem("examAnswers");
+
+      if (saved) {
+          setFormData(JSON.parse(saved));
+      }
+
+  }, []);
+
   const [submitStatus, setSubmitStatus] = useState(null);
 
   // Teacher dashboard state
@@ -158,7 +169,20 @@ export default function App() {
   };
 
   const handleStudentFormChange = (key, value) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+      setFormData(prev => {
+
+          const updated = {
+              ...prev,
+              [key]: value
+          };
+
+          localStorage.setItem(
+              "examAnswers",
+              JSON.stringify(updated)
+          );
+
+          return updated;
+      });
   };
 
   const handleStudentSubmit = async (e) => {
@@ -216,6 +240,7 @@ export default function App() {
 
     if (success) {
       setSubmitStatus('success');
+      localStorage.removeItem("examAnswers");
       triggerNotification("আপনার উত্তরপত্র সফলভাবে গৃহীত হয়েছে।", "success");
     } else {
       setSubmitStatus('error');
