@@ -112,7 +112,7 @@ export const generateSummaryPDF = async (submissions, notify) => {
     doc.line(14, 39, 196, 39);
 
     // Explicit Type Conversion to Strings
-    const tableHeaders = [['SL', 'Student ID', 'Name', 'Branch', 'Marks (100)']];
+    const tableHeaders = [['SL', 'Student ID', 'Name', 'Branch', 'Marks (10)']];
     const tableRows = submissions.map((sub, index) => [
       String(index + 1),
       String(sub.userId || '---'),

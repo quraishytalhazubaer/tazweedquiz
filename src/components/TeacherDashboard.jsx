@@ -174,7 +174,7 @@ function TeacherDashboard({
                 <th className="py-4 px-4">শাখা</th>
                 <th className="py-4 px-4">জমাদানের সময়</th>
                 <th className="py-4 px-4 text-center">মূল্যায়ন অবস্থা</th>
-                <th className="py-4 px-4 text-center">প্রাপ্ত নম্বর (১০০)</th>
+                <th className="py-4 px-4 text-center">প্রাপ্ত নম্বর (১০)</th>
                 <th className="py-4 px-6 text-right">অ্যাকশন</th>
               </tr>
             </thead>

@@ -14,7 +14,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
   const matchDetails = questions.map((q, i) => {
     const studentAns = submission[`q${i + 1}`] || ''
     const isCorrect = studentAns.trim() === q.correctAnswer.trim()
-    if (isCorrect) autoGradedMarks += 5
+    if (isCorrect) autoGradedMarks += 0.5
     return {
       num: i + 1,
       question: q.question,
@@ -57,7 +57,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
           </div>
           <div>
             <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">অটো-গ্রেডেড স্কোর</span>
-            <p className="text-lg font-extrabold mt-0.5 text-emerald-300">{autoGradedMarks} / ১০০</p>
+            <p className="text-lg font-extrabold mt-0.5 text-emerald-300">{autoGradedMarks} / 10</p>
           </div>
         </div>
       </div>

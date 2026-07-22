@@ -56,7 +56,7 @@ const calculateAutoScore = (answers) => {
       const correctNorm = q.correctAnswer.replace(/\s+/g, ' ').trim();
       const studentNorm = studentAns.replace(/\s+/g, ' ').trim();
       if (correctNorm === studentNorm) {
-        score += 5; // Total max score = 100 marks (20 Qs * 5)
+        score += 0.5; // Total max score = 100 marks (20 Qs * 5)
       }
     }
   });
