@@ -235,6 +235,26 @@ export default function App() {
         return;
       }
 
+      // Check if the student has already submitted
+      const { data: existingSubmission, error: checkError } = await supabase
+        .from("submissions")
+        .select("id")
+        .eq("user_id", formData.userId)
+        .maybeSingle();
+
+      if (checkError) {
+        throw checkError;
+      }
+
+      if (existingSubmission) {
+        setSubmitStatus("error");
+        triggerNotification(
+          "এই আইডি থেকে ইতোমধ্যে একটি উত্তরপত্র জমা দেওয়া হয়েছে।",
+          "error"
+        );
+        return;
+      }
+
       const score = calculateAutoScore(formData);
       
       // Isolate procedural questions choices out from layout identification payloads
@@ -263,8 +283,18 @@ export default function App() {
       triggerNotification("আপনার উত্তরপত্র সফলভাবে গৃহীত হয়েছে।", "success");
     } catch (err) {
       console.error("Submission failed:", err);
+        if (err.code === "23505") {
+          triggerNotification(
+            "এই আইডি থেকে ইতোমধ্যে একটি উত্তরপত্র জমা দেওয়া হয়েছে।",
+            "error"
+          );
+        } else {
+          triggerNotification(
+            "সার্ভারে উত্তরপত্র পাঠাতে ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।",
+            "error"
+          );
+        }
       setSubmitStatus('error');
-      triggerNotification("সার্ভারে উত্তরপত্র পাঠাতে ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।", "error");
     }
   };
 
@@ -287,7 +317,7 @@ export default function App() {
 
   const handleUpdateMarks = async (submissionId, newMarks) => {
     setSavingMarks(true);
-    const parsedMarks = parseInt(newMarks, 10);
+    const parsedMarks = parseFloat(newMarks, 10);
 
     try {
       const { error } = await supabase

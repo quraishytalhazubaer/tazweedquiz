@@ -79,7 +79,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
                     <h4 className="text-sm font-bold text-slate-900 leading-relaxed">{item.question}</h4>
                     {item.isCorrect ? (
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full uppercase">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Correct (+5)
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Correct (+0.5)
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full uppercase">
