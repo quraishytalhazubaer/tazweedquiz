@@ -195,7 +195,7 @@ function TeacherDashboard({
               ) : (
                 filteredSubmissions.map((sub, idx) => {
                   const isChecked = selectedIds.includes(sub.id)
-                  const marksVal = sub.marks !== undefined ? parseFloat(sub.marks, 10) : null
+                  const marksVal = sub.marks !== undefined ? parseFloat(sub.marks) : null
 
                   return (
                     <tr key={sub.id || idx} className={`hover:bg-slate-50/40 transition-colors ${isChecked ? 'bg-emerald-50/20' : ''}`}>

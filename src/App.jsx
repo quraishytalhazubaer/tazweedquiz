@@ -317,7 +317,7 @@ export default function App() {
 
   const handleUpdateMarks = async (submissionId, newMarks) => {
     setSavingMarks(true);
-    const parsedMarks = parseFloat(newMarks, 10);
+    const parsedMarks = parseFloat(newMarks);
 
     try {
       const { error } = await supabase
