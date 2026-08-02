@@ -9,7 +9,7 @@ const OfficialIBBLogo = () => {
       <div className="mb-6 transform hover:scale-105 transition-transform duration-300">
           <img 
                 src={logo}
-                className="w-24 md:w-32 lg:w-40 h-auto"
+                className="w-24 md:w-32 lg:w-40 h-auto z-10 rounded-full"
                 alt="Islami Bank Logo" 
             />
       </div>
