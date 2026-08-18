@@ -36,6 +36,7 @@ import LoginViewComponent from './components/LoginView';
 import StudentTerminalComponent from './components/StudentTerminal';
 import TeacherDashboardComponent from './components/TeacherDashboard';
 import GradingWorkspaceComponent from './components/GradingWorkspace';
+import ConfigModal from './components/SettingsModal';
 import QUESTIONS from './constants/questions';
 import { handleExportExcel, generateSummaryPDF, generateIndividualPDF } from './utils/reports';
 
@@ -69,6 +70,9 @@ const calculateAutoScore = (answers) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [isExamActive, setIsExamActive] = useState(true);
+  const [activeBatches, setActiveBatches] = useState([]);
+  const [allBatches, setAllBatches] = useState([]); // Master list of all batches
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isDatabaseReachable, setIsDatabaseReachable] = useState(null); 
   const [checkingConnection, setCheckingConnection] = useState(true);
 
@@ -80,6 +84,8 @@ export default function App() {
     userName: '',
     userId: '',
     userBranch: '',
+    designation: '',
+    batch: '',
     ...Array.from({ length: 20 }).reduce((acc, _, i) => ({ ...acc, [`q${i + 1}`]: '' }), {})
   });
 
@@ -91,6 +97,7 @@ export default function App() {
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
+  const [selectedReportBatch, setSelectedReportBatch] = useState('All');
   const [gradingSubmission, setGradingSubmission] = useState(null);
   const [savingMarks, setSavingMarks] = useState(false);
 
@@ -143,6 +150,35 @@ export default function App() {
     }
   }, [user]);
 
+  useEffect(() => {
+    const fetchExamConfig = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('exam_config')
+          .select('active_batches, all_batches') // Make sure all_batches is selected
+          .eq('id', 1)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          // Fallback to active_batches or empty array if all_batches is null in DB
+          const active = data.active_batches || [];
+          const master = data.all_batches && data.all_batches.length > 0 
+            ? data.all_batches 
+            : active;
+
+          setActiveBatches(active);
+          setAllBatches(master);
+        }
+      } catch (err) {
+        console.error('Error fetching exam config:', err);
+      }
+    };
+
+    fetchExamConfig();
+  }, []);
+
   const checkDatabaseReachability = async () => {
     setCheckingConnection(true);
     try {
@@ -180,6 +216,8 @@ export default function App() {
         userName: row.user_name,
         userId: row.user_id,
         userBranch: row.user_branch,
+        designation: row.designation,
+        batch: row.batch,
         marks: row.marks,
         date: row.date,
         timestamp: row.timestamp,
@@ -270,6 +308,8 @@ export default function App() {
           user_name: formData.userName,
           user_id: formData.userId,
           user_branch: formData.userBranch,
+          designation: formData.designation,
+          batch: formData.batch || '',
           marks: score,
           answers: answersPayload,
           date: new Date().toLocaleDateString('en-GB'),
@@ -338,6 +378,33 @@ export default function App() {
     }
   };
 
+  const handleSaveConfig = async ({ activeBatches, allBatches }) => {
+    try {
+      const { error } = await supabase
+        .from('exam_config')
+        .update({
+          active_batches: activeBatches,
+          all_batches: allBatches
+        })
+        .eq('id', 1);
+
+      if (error) {
+        console.error('Supabase update error:', error);
+        throw error;
+      }
+
+      // UPDATE BOTH LOCAL STATES IMMEDIATELY
+      setActiveBatches(activeBatches);
+      setAllBatches(allBatches); 
+
+      triggerNotification('কনফিগারেশন সফলভাবে আপডেট করা হয়েছে।', 'success');
+    } catch (error) {
+      console.error('Error saving config:', error);
+      triggerNotification('সেটিংস আপডেট করতে ব্যর্থ হয়েছে।', 'error');
+      throw error;
+    }
+  };
+
   const handleLogout = () => {
     setUser(null);
     setGradingSubmission(null);
@@ -375,6 +442,7 @@ export default function App() {
               questions={QUESTIONS}
             />
           ) : (
+            <>
             <TeacherDashboardComponent 
               submissions={submissions}
               selectedIds={selectedIds}
@@ -389,11 +457,27 @@ export default function App() {
               branchFilter={branchFilter}
               setBranchFilter={setBranchFilter}
               triggerNotification={triggerNotification}
-              openConfigSettings={null} // Removed settings panel trigger since endpoints are statically integrated via client initialization SDK
+              openConfigSettings={() => setIsConfigModalOpen(true)}
+              activeBatches={activeBatches}
+              selectedReportBatch={selectedReportBatch}
+              setSelectedReportBatch={setSelectedReportBatch}
+              onSaveConfigBatches={handleSaveConfig}
               onExportExcel={handleExportExcel}
               onGenerateSummaryPDF={generateSummaryPDF}
               onGenerateIndividualPDF={generateIndividualPDF}
             />
+            {/* Settings Configuration Modal */}
+              <ConfigModal
+                isOpen={isConfigModalOpen}
+                onClose={() => setIsConfigModalOpen(false)}
+                onSaveConfig={handleSaveConfig}
+                currentAllBatches={allBatches}  
+                currentActiveBatches={activeBatches}
+                submissions={submissions}
+                triggerNotification={triggerNotification}
+              />
+            </>
+
           )
         ) : (
           <StudentTerminalComponent 
@@ -402,7 +486,8 @@ export default function App() {
             onSubmit={handleStudentSubmit}
             submitStatus={submitStatus}
             isExamActive={isExamActive}
-            isSheetyReachable={isDatabaseReachable} // Passes current connection test validation directly to layout panels
+            activeBatches={activeBatches}
+            isSheetyReachable={isDatabaseReachable}
             checkingConnection={checkingConnection}
             onRetryConnection={checkDatabaseReachability}
             questions={QUESTIONS}

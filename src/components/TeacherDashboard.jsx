@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { CheckSquare, Download, FileText, Loader2, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
 
 function TeacherDashboard({
-  submissions,
-  selectedIds,
+  submissions = [],
+  selectedIds = [],
   setSelectedIds,
   onGrade,
   loading,
@@ -16,10 +17,23 @@ function TeacherDashboard({
   triggerNotification,
   openConfigSettings,
   onExportExcel,
+  activeBatches = [],
+  selectedReportBatch = 'All',
+  setSelectedReportBatch,
   onGenerateSummaryPDF,
   onGenerateIndividualPDF,
 }) {
   const branches = Array.from(new Set(submissions.map((sub) => sub.userBranch).filter(Boolean)))
+
+  // Extract unique batches from student submissions (checking both sub.batch and sub.userBatchGroup)
+  const submissionBatches = Array.from(
+    new Set(submissions.map((sub) => sub.batch || sub.userBatchGroup).filter(Boolean))
+  )
+
+  // Dynamically merge DB active batches + submission batches (filters out falsy values & empty strings)
+  const allAvailableBatches = Array.from(
+    new Set([...(activeBatches || []), ...submissionBatches].filter((b) => b && b.trim() !== ''))
+  )
 
   const filteredSubmissions = submissions.filter((sub) => {
     const query = searchQuery.toLowerCase()
@@ -30,7 +44,13 @@ function TeacherDashboard({
 
     const matchBranch = branchFilter ? sub.userBranch === branchFilter : true
 
-    return matchSearch && matchBranch
+    const subBatch = sub.batch || sub.userBatchGroup
+    const matchBatch =
+      !selectedReportBatch || selectedReportBatch === 'All'
+        ? true
+        : subBatch === selectedReportBatch
+
+    return matchSearch && matchBranch && matchBatch
   })
 
   const toggleSelectAll = () => {
@@ -52,14 +72,15 @@ function TeacherDashboard({
   const handleBulkIndividualPDF = () => {
     const selectedData = submissions.filter((s) => selectedIds.includes(s.id))
     if (selectedData.length === 0) {
-      triggerNotification('দয়া করে যেকোনো শিক্ষার্থী সিলেক্ট করুন।', 'error')
+      triggerNotification('দয়া করে যেকোনো শিক্ষার্থী সিলেক্ট করুন।', 'error')
       return
     }
-    onGenerateIndividualPDF(selectedData, triggerNotification)
+    onGenerateIndividualPDF(selectedData, triggerNotification, { batch: selectedReportBatch })
   }
 
   return (
     <div className="space-y-6 animate-slide-in">
+      {/* Top Header Controls */}
       <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-slate-200/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h2 className="text-2xl font-black text-slate-950 flex items-center gap-2">
@@ -73,7 +94,7 @@ function TeacherDashboard({
           <button
             onClick={openConfigSettings}
             className="p-3 bg-slate-50 hover:bg-slate-150 text-slate-700 rounded-2xl border border-slate-200 transition-all flex items-center gap-2 font-bold text-xs"
-            title="Sheety Endpoints"
+            title="Settings"
           >
             <Settings className="h-4 w-4" /> Settings
           </button>
@@ -93,30 +114,33 @@ function TeacherDashboard({
           <button
             onClick={onRefresh}
             className="p-3 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-2xl border border-slate-200 transition-all"
-            title="পুনরায় লোড করুন"
+            title="পুনরায় লোড করুন"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Filters and Exports Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Search */}
         <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex items-center">
           <span className="absolute left-3.5 text-slate-400">
             <Search className="h-4 w-4" />
           </span>
           <input
             type="text"
-            placeholder="নাম বা আইডি দিয়ে খুঁজুন..."
-            className="w-full pl-10 pr-4 py-3.5 bg-transparent text-sm focus:outline-none placeholder:text-slate-400 font-semibold"
+            placeholder="নাম বা আইডি দিয়ে খুঁজুন..."
+            className="w-full pl-10 pr-4 py-3 bg-transparent text-sm focus:outline-none placeholder:text-slate-400 font-semibold"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
+        {/* Branch Filter */}
         <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center">
           <select
-            className="w-full px-4 py-3.5 bg-transparent text-sm text-slate-700 focus:outline-none appearance-none cursor-pointer font-semibold"
+            className="w-full px-4 py-3 bg-transparent text-sm text-slate-700 focus:outline-none appearance-none cursor-pointer font-semibold"
             value={branchFilter}
             onChange={(e) => setBranchFilter(e.target.value)}
           >
@@ -125,27 +149,45 @@ function TeacherDashboard({
           </select>
         </div>
 
+        {/* Dynamic Database Report Batch Selector */}
+        <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center">
+          <select
+            className="w-full px-4 py-3 bg-transparent text-sm text-slate-700 focus:outline-none appearance-none cursor-pointer font-semibold"
+            value={selectedReportBatch}
+            onChange={(e) => setSelectedReportBatch(e.target.value)}
+          >
+            <option value="All">সকল ব্যাচ (Report: All Batches)</option>
+            {allAvailableBatches.map((b, i) => (
+              <option key={i} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Export Buttons */}
         <div className="flex gap-2">
           <button
-            onClick={() => onExportExcel(filteredSubmissions, triggerNotification)}
-            className="flex-1 px-4 py-3.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-950 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors"
+            onClick={() => onExportExcel(filteredSubmissions, triggerNotification, { batch: selectedReportBatch })}
+            className="flex-1 px-3 py-3 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-950 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors"
           >
             <Download className="h-4 w-4" /> Export CSV
           </button>
           <button
-            onClick={() => onGenerateSummaryPDF(filteredSubmissions, triggerNotification)}
-            className="flex-1 px-4 py-3.5 bg-emerald-50 hover:bg-emerald-100 text-[#1B4D1A] font-bold rounded-2xl text-xs flex items-center justify-center gap-2 shadow-sm border border-emerald-200 transition-colors"
+            onClick={() => onGenerateSummaryPDF(filteredSubmissions, triggerNotification, { batch: selectedReportBatch })}
+            className="flex-1 px-3 py-3 bg-emerald-50 hover:bg-emerald-100 text-[#1B4D1A] font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-sm border border-emerald-200 transition-colors"
           >
             <FileText className="h-4 w-4" /> Summary PDF
           </button>
         </div>
       </div>
 
+      {/* Selection Notification Bar */}
       {selectedIds.length > 0 && (
         <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-4 animate-slide-in">
           <div className="flex items-center gap-2">
             <CheckSquare className="h-5 w-5 text-emerald-800" />
-            <span className="text-sm font-bold text-emerald-900">{selectedIds.length} জন পরীক্ষার্থী সিলেক্ট করা হয়েছে।</span>
+            <span className="text-sm font-bold text-emerald-900">{selectedIds.length} জন পরীক্ষার্থী সিলেক্ট করা হয়েছে।</span>
           </div>
           <button
             onClick={handleBulkIndividualPDF}
@@ -156,6 +198,7 @@ function TeacherDashboard({
         </div>
       )}
 
+      {/* Submissions Table */}
       <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -172,8 +215,9 @@ function TeacherDashboard({
                 <th className="py-4 px-4">আইডি</th>
                 <th className="py-4 px-4">নাম</th>
                 <th className="py-4 px-4">শাখা</th>
-                <th className="py-4 px-4">জমাদানের সময়</th>
-                <th className="py-4 px-4 text-center">মূল্যায়ন অবস্থা</th>
+                <th className="py-4 px-4">ব্যাচ</th>
+                <th className="py-4 px-4">জমাদানের সময়</th>
+                <th className="py-4 px-4 text-center">মূল্যায়ন অবস্থা</th>
                 <th className="py-4 px-4 text-center">প্রাপ্ত নম্বর (১০)</th>
                 <th className="py-4 px-6 text-right">অ্যাকশন</th>
               </tr>
@@ -181,15 +225,15 @@ function TeacherDashboard({
             <tbody className="divide-y divide-slate-100 text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500 font-medium animate-pulse">
+                  <td colSpan={9} className="py-12 text-center text-slate-500 font-medium animate-pulse">
                     <Loader2 className="h-8 w-8 text-emerald-600 animate-spin mx-auto mb-2" />
-                    মূল্যায়ন পত্র লোড করা হচ্ছে...
+                    মূল্যায়ন পত্র লোড করা হচ্ছে...
                   </td>
                 </tr>
               ) : filteredSubmissions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
-                    কোনো পরীক্ষার্থীর উত্তরপত্র পাওয়া যায়নি।
+                  <td colSpan={9} className="py-12 text-center text-slate-500">
+                    কোনো পরীক্ষার্থীর উত্তরপত্র পাওয়া যায়নি।
                   </td>
                 </tr>
               ) : (
@@ -212,6 +256,7 @@ function TeacherDashboard({
                         <div className="font-bold text-slate-950">{sub.userName}</div>
                       </td>
                       <td className="py-4 px-4 text-slate-600 font-medium">{sub.userBranch || '---'}</td>
+                      <td className="py-4 px-4 text-slate-600 font-medium">{sub.batch || sub.userBatchGroup || '---'}</td>
                       <td className="py-4 px-4 text-xs text-slate-500 font-sans">{sub.timestamp || sub.date || '---'}</td>
                       <td className="py-4 px-4 text-center">
                         {marksVal !== null ? (
@@ -229,7 +274,7 @@ function TeacherDashboard({
                       </td>
                       <td className="py-4 px-6 text-right space-x-2">
                         <button
-                          onClick={() => onGenerateIndividualPDF([sub], triggerNotification)}
+                          onClick={() => onGenerateIndividualPDF([sub], triggerNotification, { batch: selectedReportBatch })}
                           className="p-2 text-slate-400 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition inline-flex items-center"
                           title="পিডিএফ ডাউনলোড"
                         >

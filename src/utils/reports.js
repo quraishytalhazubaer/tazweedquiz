@@ -72,7 +72,7 @@ export const handleExportExcel = (submissions, notify) => {
   notify('CSV ফাইল সফলভাবে ডাউনলোড হয়েছে।', 'success');
 };
 
-// --- 2. Corrected Summary PDF Engine ---
+// --- 2. Summary PDF Engine ---
 export const generateSummaryPDF = async (submissions, notify) => {
   if (!submissions || submissions.length === 0) {
     notify('No data found to export.', 'error');
@@ -89,8 +89,8 @@ export const generateSummaryPDF = async (submissions, notify) => {
     // Header Layout
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(16);
-    doc.setTextColor(27, 77, 26); // IBTRA Green
-    doc.text('Islami Bank Training and Research Academy (IBTRA)', 105, 15, { align: 'center' });
+    doc.setTextColor(27, 77, 26);
+    doc.text('Islami Bank Training and Research Academy', 105, 15, { align: 'center' });
 
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9);
@@ -102,14 +102,16 @@ export const generateSummaryPDF = async (submissions, notify) => {
     doc.setTextColor(17, 24, 37);
     doc.text('Tajweed Quiz - Consolidated Result Sheet', 105, 29, { align: 'center' });
 
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(107, 114, 128);
-    doc.text(`Date Generated: ${new Date().toLocaleDateString('en-GB')}`, 105, 35, { align: 'center' });
+    // doc.setFont('Helvetica', 'normal');
+    // doc.setFontSize(9);
+    // doc.setTextColor(107, 114, 128);
+    // doc.text(`Date Generated: ${new Date().toLocaleDateString('en-GB')}`, 105, 35, { align: 'center' });
 
-    doc.setDrawColor(27, 77, 26);
-    doc.setLineWidth(0.8);
-    doc.line(14, 39, 196, 39);
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    // doc.text(`Batch: ${submissions[0].batch}`, 14, 34)
+    doc.text(`Exam Date: ${submissions[0].date}`, 14, 40)
+    doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 152, 40)
 
     // Explicit Type Conversion to Strings
     const tableHeaders = [['SL', 'Student ID', 'Name', 'Branch', 'Marks (10)']];
@@ -153,12 +155,12 @@ export const generateSummaryPDF = async (submissions, notify) => {
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(27, 77, 26);
-    doc.text('Course Coordinator', 165, finalY + 5, { align: 'center' });
+    doc.text('Talha Zubaer Siddique Al-Quraishy', 165, finalY + 5, { align: 'center' });
     
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(107, 114, 128);
-    doc.text('IBTRA Administration', 165, finalY + 10, { align: 'center' });
+    doc.text('Instructor', 165, finalY + 10, { align: 'center' });
 
     doc.save(`IBTRA_Consolidated_Results_${Date.now()}.pdf`);
     notify('Summary PDF downloaded successfully.', 'success');

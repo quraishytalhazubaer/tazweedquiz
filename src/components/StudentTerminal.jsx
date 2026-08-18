@@ -10,6 +10,7 @@ function StudentTerminal({
   checkingConnection,
   onRetryConnection,
   questions,
+  activeBatches = [], // <-- Pass activeBatches prop with fallback
 }) {
   if (checkingConnection) {
     return (
@@ -17,7 +18,7 @@ function StudentTerminal({
         <Loader2 className="h-12 w-12 text-[#1B4D1A] animate-spin" />
         <div>
           <h3 className="text-lg font-bold text-slate-800">সার্ভার সংযোগ যাচাই করা হচ্ছে...</h3>
-          <p className="text-sm text-slate-500 mt-1">দয়া করে কিছুক্ষণ অপেক্ষা করুন।</p>
+          <p className="text-sm text-slate-500 mt-1">দয়া করে কিছুক্ষণ অপেক্ষা করুন।</p>
         </div>
       </div>
     )
@@ -31,7 +32,7 @@ function StudentTerminal({
         </div>
         <h3 className="text-xl font-black text-slate-900">সার্ভার সংযোগ ত্রুটি</h3>
         <p className="text-sm text-slate-600 mt-3 leading-relaxed">
-          পরীক্ষার মূল ডেটাবেজ সার্ভারটি বর্তমানে অফলাইন অথবা সাময়িকভাবে আপনার ডিভাইস থেকে অ্যাক্সেস করা যাচ্ছে না। সংযোগ বিঘ্নিত থাকায় প্রশ্নপত্র প্রদর্শন বন্ধ রয়েছে।
+          পরীক্ষার মূল ডেটাবেজ সার্ভারটি বর্তমানে অফলাইন অথবা সাময়িকভাবে আপনার ডিভাইস থেকে অ্যাক্সেস করা যাচ্ছে না। সংযোগ বিঘ্নিত থাকায় প্রশ্নপত্র প্রদর্শন বন্ধ রয়েছে।
         </p>
         <div className="mt-8 space-y-3">
           <button
@@ -52,9 +53,9 @@ function StudentTerminal({
           <CheckSquare className="h-10 w-10" />
         </div>
         <h2 className="text-3xl font-extrabold text-emerald-800">আলহামদুলিল্লাহ!</h2>
-        <p className="text-slate-600 font-medium mt-3 text-lg">আপনার উত্তরপত্র সফলভাবে জমা নেওয়া হয়েছে।</p>
+        <p className="text-slate-600 font-medium mt-3 text-lg">আপনার উত্তরপত্র সফলভাবে জমা নেওয়া হয়েছে।</p>
         <div className="mt-8 pt-6 border-t border-slate-100">
-          <p className="text-sm text-slate-500">আপনার অটো-গ্রেডিং সম্পন্ন হয়েছে। শিক্ষক খাতা মূল্যায়ন শেষে আপনার ফলাফল প্রকাশ করবেন।</p>
+          <p className="text-sm text-slate-500">আপনার অটো-গ্রেডিং সম্পন্ন হয়েছে। শিক্ষক খাতা মূল্যায়ন শেষে আপনার ফলাফল প্রকাশ করবেন।</p>
         </div>
       </div>
     )
@@ -64,9 +65,9 @@ function StudentTerminal({
     <div className="max-w-4xl mx-auto space-y-8 animate-slide-in">
       <div className="bg-gradient-to-r from-[#1B4D1A] to-emerald-900 rounded-[2rem] p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h2 className="text-2xl md:text-3xl font-black">তাজবিদ মূল্যায়ন পরীক্ষা</h2>
+          <h2 className="text-2xl md:text-3xl font-black">তাজবিদ মূল্যায়ন পরীক্ষা</h2>
           <p className="text-sm text-emerald-100/80 mt-2 leading-relaxed max-w-xl">
-            ইসলামী শরীয়াহ অনুযায়ী বিশুদ্ধ কুরআন তেলাওয়াতের ওপর অনলাইন কুইজ পরীক্ষা। প্রতিটি প্রশ্নের সঠিক উত্তর নির্বাচন করুন।
+            ইসলামী শরীয়াহ অনুযায়ী বিশুদ্ধ কুরআন তেলাওয়াতের ওপর অনলাইন কুইজ পরীক্ষা। প্রতিটি প্রশ্নের সঠিক উত্তর নির্বাচন করুন।
           </p>
         </div>
         <div className="shrink-0 flex items-center gap-3 bg-white/10 border border-white/20 text-white px-5 py-3.5 rounded-2xl font-bold text-sm">
@@ -82,7 +83,9 @@ function StudentTerminal({
               <span className="w-2 h-6 bg-[#1B4D1A] rounded-full"></span>
               পরীক্ষার্থীর বেসিক পরিচিতি তথ্য
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Grid updated to 2 rows of 2 to fit Batch & Designation */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 uppercase block">Full Name</label>
                 <input
@@ -90,10 +93,11 @@ function StudentTerminal({
                   type="text"
                   placeholder="Muhammad Abdullah"
                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-600 focus:outline-none transition"
-                  value={formData.userName}
+                  value={formData.userName || ''}
                   onChange={(e) => onChange('userName', e.target.value)}
                 />
               </div>
+
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 uppercase block">Employee ID</label>
                 <input
@@ -101,10 +105,23 @@ function StudentTerminal({
                   type="text"
                   placeholder="5012"
                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-600 focus:outline-none transition"
-                  value={formData.userId}
+                  value={formData.userId || ''}
                   onChange={(e) => onChange('userId', e.target.value)}
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase block">Designation</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="Executive / Officer / Assistant"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-600 focus:outline-none transition"
+                  value={formData.designation}
+                  onChange={(e) => onChange('designation', e.target.value)}
+                />
+              </div>
+
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 uppercase block">Branch</label>
                 <input
@@ -112,15 +129,34 @@ function StudentTerminal({
                   type="text"
                   placeholder="Head Office"
                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-600 focus:outline-none transition"
-                  value={formData.userBranch}
+                  value={formData.userBranch || ''}
                   onChange={(e) => onChange('userBranch', e.target.value)}
                 />
+              </div>
+
+              {/* Dynamic Active Batch Dropdown */}
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-xs font-bold text-slate-700 uppercase block">Select Batch</label>
+                <select
+                  required
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-600 focus:outline-none transition font-semibold"
+                  value={formData.batch || ''}
+                  onChange={(e) => onChange('batch', e.target.value)}
+                >
+                  <option value="" disabled>-- আপনার ব্যাচ সিলেক্ট করুন --</option>
+                  {activeBatches.map((b, idx) => (
+                    <option key={idx} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
 
+          {/* Question Section */}
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-slate-900 px-1">মূল্যায়ন প্রশ্নাবলী (Tajweed Questions)</h3>
+            <h3 className="text-xl font-black text-slate-900 px-1">মূল্যায়ন প্রশ্নাবলী (Tajweed Questions)</h3>
             <div className="space-y-5">
               {questions.map((q, index) => {
                 const questionKey = `q${index + 1}`
@@ -190,9 +226,9 @@ function StudentTerminal({
       ) : (
         <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm">
           <Clock className="h-16 w-16 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-2xl font-bold text-slate-800">পরীক্ষা বর্তমানে বন্ধ রয়েছে</h3>
+          <h3 className="text-2xl font-bold text-slate-800">পরীক্ষা বর্তমানে বন্ধ রয়েছে</h3>
           <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
-            কোর্স সমন্বয়ক এই মুহূর্তে তাজবিদ পরীক্ষাটি সাময়িকভাবে বন্ধ রেখেছেন। পুনরায় চালু করতে শিক্ষকের নির্দেশনা বা ড্যাশবোর্ড আপডেট রিফ্রেশ করুন।
+            কোর্স সমন্বয়ক এই মুহূর্তে তাজবিদ পরীক্ষাটি সাময়িকভাবে বন্ধ রেখেছেন। পুনরায় চালু করতে শিক্ষকের নির্দেশনা বা ড্যাশবোর্ড আপডেট রিফ্রেশ করুন।
           </p>
         </div>
       )}
