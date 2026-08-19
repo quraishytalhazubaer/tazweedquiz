@@ -241,14 +241,17 @@ function TeacherDashboard({
                 filteredSubmissions.map((sub, idx) => {
                   const isChecked = selectedIds.includes(sub.id)
                   
-                  // 1. Existing Marks from database
+                  // Existing Written Marks
                   const existingMarks = sub.marks !== undefined && sub.marks !== null ? parseFloat(sub.marks) : null
                   const isEvaluated = existingMarks !== null
 
-                  // 2. Viva Marks from database (sub.viva_marks or fallback sub.vivaMarks)
+                  // Viva Marks
                   const vivaValue = sub.viva_marks ?? sub.vivaMarks ?? ''
+                  
+                  // Status is 'Graded' if explicitly set OR if viva marks exist
+                  const isGraded = sub.status === 'Graded' || sub.status === 'graded';
 
-                  // 3. Total Marks from database (sub.total_marks or fallback sub.totalMarks, calculated if missing)
+                  // Total Marks
                   const totalMarks = sub.total_marks ?? sub.totalMarks ?? (
                     isEvaluated ? existingMarks + (parseFloat(vivaValue) || 0) : '---'
                   )
@@ -270,24 +273,30 @@ function TeacherDashboard({
                       <td className="py-4 px-4 text-slate-600 font-medium">{sub.userBranch || '---'}</td>
                       <td className="py-4 px-4 text-slate-600 font-medium">{sub.batch || sub.userBatchGroup || '---'}</td>
                       <td className="py-4 px-4 text-xs text-slate-500 font-sans">{sub.timestamp || sub.date || '---'}</td>
+                      
+                      {/* Evaluation Status Badge */}
                       <td className="py-4 px-4 text-center">
-                        {isEvaluated ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                        {isGraded ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                            Graded
+                          </span>
+                        ) : isEvaluated ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                             Evaluated
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
                             Pending
                           </span>
                         )}
                       </td>
                       
-                      {/* Existing Marks Column */}
+                      {/* Written Marks */}
                       <td className="py-4 px-4 text-center font-black text-base text-[#1B4D1A]">
                         {isEvaluated ? existingMarks : '---'}
                       </td>
 
-                      {/* Viva Marks Column */}
+                      {/* Viva Marks Input - Locked / Read-Only when Graded */}
                       <td className="py-4 px-4 text-center">
                         <input
                           type="number"
@@ -295,13 +304,19 @@ function TeacherDashboard({
                           max="5"
                           step="0.5"
                           value={vivaValue}
+                          disabled={isGraded}
+                          readOnly={isGraded}
                           onChange={(e) => onUpdateVivaMarks && onUpdateVivaMarks(sub.id, e.target.value)}
                           placeholder="0"
-                          className="w-16 text-center py-1 rounded-lg border border-slate-300 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className={`w-16 text-center py-1 rounded-lg border font-bold focus:outline-none ${
+                            isGraded
+                              ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                              : 'bg-white border-slate-300 text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500'
+                          }`}
                         />
                       </td>
 
-                      {/* Total Marks Column */}
+                      {/* Total Marks */}
                       <td className="py-4 px-4 text-center font-black text-base text-emerald-800">
                         {totalMarks}
                       </td>
@@ -316,9 +331,9 @@ function TeacherDashboard({
                         </button>
                         <button
                           onClick={() => onGrade(sub)}
-                          className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 active:bg-black text-white font-bold rounded-xl text-xs transition inline-flex items-center"
+                          className="px-4 py-1.5 bg-green-900 hover:bg-green-500 active:bg-black text-white hover:text-black font-bold rounded-xl text-xs transition inline-flex items-center"
                         >
-                          খাতা দেখুন (Grade)
+                          Check
                         </button>
                       </td>
                     </tr>

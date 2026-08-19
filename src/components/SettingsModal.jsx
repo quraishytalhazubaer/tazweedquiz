@@ -8,7 +8,8 @@ export default function SettingsModal({
   currentActiveBatches = [],
   currentAllBatches = [],
   submissions = [],
-  triggerNotification
+  triggerNotification,
+  onToggleAllGraded
 }) {
   const [activeBatches, setActiveBatches] = useState([]);
   const [allBatches, setAllBatches] = useState([]); // Fixed: Defined setAllBatches state
@@ -41,6 +42,19 @@ export default function SettingsModal({
   }, [isOpen]); 
 
   if (!isOpen) return null;
+
+  // Checks if EVERY submission currently has status 'Graded'
+  const isAllGraded =
+    submissions.length > 0 &&
+    submissions.every(
+      (sub) => sub.status === 'Graded' || sub.status === 'graded'
+    )
+
+  const handleToggle = () => {
+    // If all are graded, toggle back to Evaluated (false), otherwise set all to Graded (true)
+    const nextGradedState = !isAllGraded
+    onToggleAllGraded(nextGradedState)
+  }
 
   const handleToggleBatch = (batchName) => {
     setActiveBatches((prev) =>
@@ -107,6 +121,36 @@ export default function SettingsModal({
             className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
           >
             <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Status Toggle Row */}
+        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+          <div>
+            <p className="font-bold text-sm text-slate-800">
+              সকল রেজাল্ট {isAllGraded ? 'Graded' : 'Evaluated'} অবস্থায় আছে
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isAllGraded
+                ? 'অফ করলে সকল রেকর্ড Evaluated হবে।'
+                : 'অন করলে সকল রেকর্ড Graded হবে।'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isAllGraded}
+            onClick={handleToggle}
+            className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              isAllGraded ? 'bg-emerald-600' : 'bg-slate-300'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                isAllGraded ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
           </button>
         </div>
 

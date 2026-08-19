@@ -218,6 +218,7 @@ export default function App() {
         userBranch: row.user_branch,
         designation: row.designation,
         batch: row.batch,
+        status: row.status,
         marks: row.marks,
         viva_marks: row.viva_marks,
         total_marks: row.total_marks,
@@ -390,35 +391,42 @@ export default function App() {
         ? parseFloat(targetSub.marks)
         : 0;
 
-    const calculatedTotal = existingMarks + numericViva;
+    const calculatedTotal = numericViva !== null ? existingMarks + numericViva : existingMarks;
+    
+    // Set status to 'Graded' if viva marks exist, otherwise keep existing status or set 'Evaluated'
+    const newStatus = numericViva !== null ? 'Graded' : (targetSub?.status || 'Evaluated');
 
-    // 1. Immediate UI Local State Update
+    // 1. Update React Local State
     setSubmissions((prev) =>
       prev.map((sub) =>
         sub.id === submissionId
           ? {
               ...sub,
-              viva_marks: vivaValue === '' ? null : numericViva,
+              viva_marks: numericViva,
+              vivaMarks: numericViva,
               total_marks: calculatedTotal,
+              totalMarks: calculatedTotal,
+              status: newStatus,
             }
           : sub
       )
     );
 
-    // 2. Database Update in Supabase
+    // 2. Persist to Supabase
     try {
       const { error } = await supabase
         .from('submissions')
         .update({
-          viva_marks: vivaValue === '' ? null : numericViva,
+          viva_marks: numericViva,
           total_marks: calculatedTotal,
+          status: newStatus,
         })
         .eq('id', submissionId);
 
       if (error) throw error;
     } catch (err) {
-      console.error('Failed to save viva and total marks in database:', err);
-      triggerNotification('ভাইভা ও মোট নম্বর ডাটাবেজে সেভ করতে সমস্যা হয়েছে', 'error');
+      console.error('Failed to update marks and status in Supabase:', err);
+      triggerNotification('ডাটাবেজে সেভ হতে ব্যর্থ হয়েছে', 'error');
     }
   };
 
@@ -446,6 +454,38 @@ export default function App() {
       console.error('Error saving config:', error);
       triggerNotification('সেটিংস আপডেট করতে ব্যর্থ হয়েছে।', 'error');
       throw error;
+    }
+  };
+
+  const handleToggleAllGraded = async (isGradedAll) => {
+    const targetStatus = isGradedAll ? 'Graded' : 'Evaluated';
+
+    // 1. Update React Local State
+    setSubmissions((prev) =>
+      prev.map((sub) => ({
+        ...sub,
+        status: targetStatus,
+      }))
+    );
+
+    // 2. Persist to Supabase for all records
+    try {
+      const { error } = await supabase
+        .from('submissions')
+        .update({ status: targetStatus })
+        .not('id', 'is', null); // Updates all valid records
+
+      if (error) throw error;
+
+      triggerNotification(
+        isGradedAll
+          ? 'সকল রেকর্ড Graded অবস্থায় পরিবর্তন করা হয়েছে'
+          : 'সকল রেকর্ড Evaluated অবস্থায় পরিবর্তন করা হয়েছে',
+        'success'
+      );
+    } catch (err) {
+      console.error('Failed to update all records status:', err);
+      triggerNotification('অবস্থা পরিবর্তন করতে সমস্যা হয়েছে', 'error');
     }
   };
 
@@ -519,6 +559,7 @@ export default function App() {
                 currentAllBatches={allBatches}  
                 currentActiveBatches={activeBatches}
                 submissions={submissions}
+                onToggleAllGraded={handleToggleAllGraded}
                 triggerNotification={triggerNotification}
               />
             </>
