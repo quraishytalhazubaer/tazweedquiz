@@ -6,6 +6,7 @@ function TeacherDashboard({
   selectedIds = [],
   setSelectedIds,
   onGrade,
+  onUpdateVivaMarks,
   loading,
   onRefresh,
   isExamActive,
@@ -25,12 +26,10 @@ function TeacherDashboard({
 }) {
   const branches = Array.from(new Set(submissions.map((sub) => sub.userBranch).filter(Boolean)))
 
-  // Extract unique batches from student submissions (checking both sub.batch and sub.userBatchGroup)
   const submissionBatches = Array.from(
     new Set(submissions.map((sub) => sub.batch || sub.userBatchGroup).filter(Boolean))
   )
 
-  // Dynamically merge DB active batches + submission batches (filters out falsy values & empty strings)
   const allAvailableBatches = Array.from(
     new Set([...(activeBatches || []), ...submissionBatches].filter((b) => b && b.trim() !== ''))
   )
@@ -219,27 +218,40 @@ function TeacherDashboard({
                 <th className="py-4 px-4">জমাদানের সময়</th>
                 <th className="py-4 px-4 text-center">মূল্যায়ন অবস্থা</th>
                 <th className="py-4 px-4 text-center">প্রাপ্ত নম্বর (১০)</th>
+                <th className="py-4 px-4 text-center">ভাইভা (৫)</th>
+                <th className="py-4 px-4 text-center">মোট নম্বর (১৫)</th>
                 <th className="py-4 px-6 text-right">অ্যাকশন</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-500 font-medium animate-pulse">
+                  <td colSpan={11} className="py-12 text-center text-slate-500 font-medium animate-pulse">
                     <Loader2 className="h-8 w-8 text-emerald-600 animate-spin mx-auto mb-2" />
                     মূল্যায়ন পত্র লোড করা হচ্ছে...
                   </td>
                 </tr>
               ) : filteredSubmissions.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-500">
+                  <td colSpan={11} className="py-12 text-center text-slate-500">
                     কোনো পরীক্ষার্থীর উত্তরপত্র পাওয়া যায়নি।
                   </td>
                 </tr>
               ) : (
                 filteredSubmissions.map((sub, idx) => {
                   const isChecked = selectedIds.includes(sub.id)
-                  const marksVal = sub.marks !== undefined ? parseFloat(sub.marks) : null
+                  
+                  // 1. Existing Marks from database
+                  const existingMarks = sub.marks !== undefined && sub.marks !== null ? parseFloat(sub.marks) : null
+                  const isEvaluated = existingMarks !== null
+
+                  // 2. Viva Marks from database (sub.viva_marks or fallback sub.vivaMarks)
+                  const vivaValue = sub.viva_marks ?? sub.vivaMarks ?? ''
+
+                  // 3. Total Marks from database (sub.total_marks or fallback sub.totalMarks, calculated if missing)
+                  const totalMarks = sub.total_marks ?? sub.totalMarks ?? (
+                    isEvaluated ? existingMarks + (parseFloat(vivaValue) || 0) : '---'
+                  )
 
                   return (
                     <tr key={sub.id || idx} className={`hover:bg-slate-50/40 transition-colors ${isChecked ? 'bg-emerald-50/20' : ''}`}>
@@ -259,7 +271,7 @@ function TeacherDashboard({
                       <td className="py-4 px-4 text-slate-600 font-medium">{sub.batch || sub.userBatchGroup || '---'}</td>
                       <td className="py-4 px-4 text-xs text-slate-500 font-sans">{sub.timestamp || sub.date || '---'}</td>
                       <td className="py-4 px-4 text-center">
-                        {marksVal !== null ? (
+                        {isEvaluated ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
                             Evaluated
                           </span>
@@ -269,9 +281,31 @@ function TeacherDashboard({
                           </span>
                         )}
                       </td>
+                      
+                      {/* Existing Marks Column */}
                       <td className="py-4 px-4 text-center font-black text-base text-[#1B4D1A]">
-                        {marksVal !== null ? `${marksVal}` : '---'}
+                        {isEvaluated ? existingMarks : '---'}
                       </td>
+
+                      {/* Viva Marks Column */}
+                      <td className="py-4 px-4 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          max="5"
+                          step="0.5"
+                          value={vivaValue}
+                          onChange={(e) => onUpdateVivaMarks && onUpdateVivaMarks(sub.id, e.target.value)}
+                          placeholder="0"
+                          className="w-16 text-center py-1 rounded-lg border border-slate-300 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </td>
+
+                      {/* Total Marks Column */}
+                      <td className="py-4 px-4 text-center font-black text-base text-emerald-800">
+                        {totalMarks}
+                      </td>
+
                       <td className="py-4 px-6 text-right space-x-2">
                         <button
                           onClick={() => onGenerateIndividualPDF([sub], triggerNotification, { batch: selectedReportBatch })}

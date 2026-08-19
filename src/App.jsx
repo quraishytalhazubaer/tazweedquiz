@@ -219,6 +219,8 @@ export default function App() {
         designation: row.designation,
         batch: row.batch,
         marks: row.marks,
+        viva_marks: row.viva_marks,
+        total_marks: row.total_marks,
         date: row.date,
         timestamp: row.timestamp,
         ...row.answers
@@ -378,6 +380,48 @@ export default function App() {
     }
   };
 
+  const handleUpdateVivaMarks = async (submissionId, vivaValue) => {
+    const numericViva = vivaValue === '' ? 0 : parseFloat(vivaValue);
+
+    // Find target submission to sum existing `marks` + `viva_marks`
+    const targetSub = submissions.find((s) => s.id === submissionId);
+    const existingMarks =
+      targetSub?.marks !== undefined && targetSub?.marks !== null
+        ? parseFloat(targetSub.marks)
+        : 0;
+
+    const calculatedTotal = existingMarks + numericViva;
+
+    // 1. Immediate UI Local State Update
+    setSubmissions((prev) =>
+      prev.map((sub) =>
+        sub.id === submissionId
+          ? {
+              ...sub,
+              viva_marks: vivaValue === '' ? null : numericViva,
+              total_marks: calculatedTotal,
+            }
+          : sub
+      )
+    );
+
+    // 2. Database Update in Supabase
+    try {
+      const { error } = await supabase
+        .from('submissions')
+        .update({
+          viva_marks: vivaValue === '' ? null : numericViva,
+          total_marks: calculatedTotal,
+        })
+        .eq('id', submissionId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed to save viva and total marks in database:', err);
+      triggerNotification('ভাইভা ও মোট নম্বর ডাটাবেজে সেভ করতে সমস্যা হয়েছে', 'error');
+    }
+  };
+
   const handleSaveConfig = async ({ activeBatches, allBatches }) => {
     try {
       const { error } = await supabase
@@ -450,6 +494,7 @@ export default function App() {
               onGrade={(sub) => setGradingSubmission(sub)}
               loading={loadingSubmissions}
               onRefresh={fetchSubmissions}
+              onUpdateVivaMarks={handleUpdateVivaMarks}
               isExamActive={isExamActive}
               setIsExamActive={handleToggleExamStatus}
               searchQuery={searchQuery}

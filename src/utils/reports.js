@@ -120,7 +120,7 @@ export const generateSummaryPDF = async (submissions, notify) => {
       String(sub.userId || '---'),
       String(sub.userName || '---'),
       String(sub.userBranch || '---'),
-      String(sub.marks !== undefined ? sub.marks : '---')
+      String(sub.total_marks !== undefined ? sub.total_marks : '---')
     ]);
 
     // Render Table using the newly exposed global plugin namespace
