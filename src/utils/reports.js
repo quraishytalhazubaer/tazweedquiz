@@ -45,7 +45,7 @@ export const handleExportExcel = (submissions, notify) => {
     return;
   }
 
-  const headers = ['Name', 'Student ID', 'Branch', 'Date', 'Marks', ...Array.from({ length: 20 }, (_, i) => `Q${i + 1}`)];
+  const headers = ['Name', 'EMP. ID', 'Branch', 'Date', 'Marks', ...Array.from({ length: 20 }, (_, i) => `Q${i + 1}`)];
   const csvRows = [headers.join(',')];
 
   submissions.forEach((sub) => {
@@ -114,12 +114,14 @@ export const generateSummaryPDF = async (submissions, notify) => {
     doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 152, 40)
 
     // Explicit Type Conversion to Strings
-    const tableHeaders = [['SL', 'Student ID', 'Name', 'Branch', 'Marks (10)']];
+    const tableHeaders = [['SL', 'Emp. ID', 'Name', 'Branch', 'Written (10)', 'Viva (5)', 'Total Marks (15)']];
     const tableRows = submissions.map((sub, index) => [
       String(index + 1),
       String(sub.userId || '---'),
       String(sub.userName || '---'),
       String(sub.userBranch || '---'),
+      String(sub.marks !== undefined ? sub.marks : '---'),
+      String(sub.viva_marks !== undefined ? sub.viva_marks : '---'),
       String(sub.total_marks !== undefined ? sub.total_marks : '---')
     ]);
 
@@ -129,10 +131,10 @@ export const generateSummaryPDF = async (submissions, notify) => {
       head: tableHeaders,
       body: tableRows,
       theme: 'striped',
-      headStyles: { fillColor: [27, 77, 26], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+      headStyles: { fillColor: [27, 77, 26], textColor: [255, 255, 255], fontStyle: 'bold' },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 15 },
-        1: { fontStyle: 'bold', cellWidth: 35 },
+        0: { halign: 'center', cellWidth: 10 },
+        1: { fontStyle: 'bold', cellWidth: 20 },
         2: { fontStyle: 'bold', textColor: [17, 24, 37] },
         3: { cellWidth: 45 },
         4: { halign: 'center', fontStyle: 'bold', textColor: [27, 77, 26], cellWidth: 25 }

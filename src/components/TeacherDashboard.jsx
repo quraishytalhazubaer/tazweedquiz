@@ -156,11 +156,16 @@ function TeacherDashboard({
             onChange={(e) => setSelectedReportBatch(e.target.value)}
           >
             <option value="All">সকল ব্যাচ (Report: All Batches)</option>
-            {allAvailableBatches.map((b, i) => (
-              <option key={i} value={b}>
+            {activeBatches.map((b, idx) => (
+              <option key={idx} value={b}>
                 {b}
               </option>
             ))}
+            {/* {allAvailableBatches.map((b, i) => (
+              <option key={i} value={b}>
+                {b}
+              </option>
+            ))} */}
           </select>
         </div>
 
