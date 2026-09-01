@@ -69,6 +69,7 @@ const calculateAutoScore = (answers) => {
 // ============================================================================
 export default function App() {
   const [user, setUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isExamActive, setIsExamActive] = useState(true);
   const [activeBatches, setActiveBatches] = useState([]);
   const [allBatches, setAllBatches] = useState([]); // Master list of all batches
@@ -107,6 +108,61 @@ export default function App() {
       setNotification(null);
     }, 4500);
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const restoreUser = async (session) => {
+      if (!session?.user) {
+        if (isMounted) {
+          setUser(null);
+          setIsAuthLoading(false);
+        }
+        return;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role, full_name')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!isMounted) return;
+
+      if (error || !profile) {
+        console.error('Failed to restore user profile:', error);
+        setUser(null);
+      } else {
+        setUser({
+          role: profile.role,
+          name: profile.full_name,
+          user: session.user,
+        });
+      }
+      setIsAuthLoading(false);
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      restoreUser(session);
+    }).catch((error) => {
+      console.error('Failed to restore Supabase session:', error);
+      if (isMounted) {
+        setUser(null);
+        setIsAuthLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') {
+        setTimeout(() => restoreUser(session), 0);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // Synchronize initial local storage data cache
   useEffect(() => {
@@ -489,7 +545,8 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setGradingSubmission(null);
     setSubmitStatus(null);
@@ -501,6 +558,14 @@ export default function App() {
     });
     triggerNotification("সফলভাবে লগআউট করা হয়েছে।");
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-600">
+        Checking your session...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-emerald-100 selection:text-emerald-900 transition-colors duration-300">
