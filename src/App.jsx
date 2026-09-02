@@ -34,6 +34,8 @@ import NotificationToast from './components/NotificationToast';
 import AppHeader from './components/AppHeader';
 import LoginViewComponent from './components/LoginView';
 import StudentTerminalComponent from './components/StudentTerminal';
+import StudentPortal from './components/StudentPortal';
+import CourseMaterials from './components/CourseMaterials';
 import TeacherDashboardComponent from './components/TeacherDashboard';
 import GradingWorkspaceComponent from './components/GradingWorkspace';
 import ConfigModal from './components/SettingsModal';
@@ -101,6 +103,14 @@ export default function App() {
   const [selectedReportBatch, setSelectedReportBatch] = useState('All');
   const [gradingSubmission, setGradingSubmission] = useState(null);
   const [savingMarks, setSavingMarks] = useState(false);
+  const [studentProfile, setStudentProfile] = useState({
+    name: '',
+    employeeId: '',
+    designation: '',
+    branch: '',
+    phone: '',
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
 
   const triggerNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -204,6 +214,35 @@ export default function App() {
     if (user?.role === 'teacher') {
       fetchSubmissions();
     }
+  }, [user]);
+
+  useEffect(() => {
+    if (user?.role !== 'student') return;
+
+    const loadStudentProfile = async () => {
+      const metadata = user.user?.user_metadata || {};
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.user.id)
+        .single();
+
+      if (error) {
+        console.error('Failed to load student profile:', error);
+        triggerNotification('প্রোফাইল লোড করা যায়নি।', 'error');
+        return;
+      }
+
+      setStudentProfile({
+        name: data.full_name || user.name || metadata.full_name || '',
+        employeeId: data.employee_id || data.employeeId || metadata.employee_id || '',
+        designation: data.designation || metadata.designation || '',
+        branch: data.branch || data.user_branch || metadata.branch || '',
+        phone: data.phone || metadata.phone || '',
+      });
+    };
+
+    loadStudentProfile();
   }, [user]);
 
   useEffect(() => {
@@ -567,6 +606,34 @@ export default function App() {
     triggerNotification("সফলভাবে লগআউট করা হয়েছে।");
   };
 
+  const handleStudentProfileSave = async (profile) => {
+    setProfileSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profile.name,
+          employee_id: profile.employeeId,
+          designation: profile.designation,
+          branch: profile.branch,
+          phone: profile.phone,
+        })
+        .eq('id', user.user.id);
+
+      if (error) throw error;
+
+      localStorage.setItem('studentProfile', JSON.stringify(profile));
+      setStudentProfile(profile);
+      setUser((current) => ({ ...current, name: profile.name }));
+      triggerNotification('প্রোফাইল সফলভাবে আপডেট করা হয়েছে।', 'success');
+    } catch (error) {
+      console.error('Failed to update student profile:', error);
+      triggerNotification('প্রোফাইল আপডেট করা যায়নি।', 'error');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   if (isAuthLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-600">
@@ -600,6 +667,7 @@ export default function App() {
             />
           ) : (
             <>
+            <CourseMaterials canManage onNotify={triggerNotification} />
             <TeacherDashboardComponent 
               submissions={submissions}
               selectedIds={selectedIds}
@@ -639,17 +707,25 @@ export default function App() {
 
           )
         ) : (
-          <StudentTerminalComponent 
-            formData={formData}
-            onChange={handleStudentFormChange}
-            onSubmit={handleStudentSubmit}
-            submitStatus={submitStatus}
-            isExamActive={isExamActive}
-            activeBatches={activeBatches}
-            isSheetyReachable={isDatabaseReachable}
-            checkingConnection={checkingConnection}
-            onRetryConnection={checkDatabaseReachability}
-            questions={QUESTIONS}
+          <StudentPortal
+            profile={studentProfile}
+            onProfileSave={handleStudentProfileSave}
+            profileSaving={profileSaving}
+            onNotify={triggerNotification}
+            examView={
+              <StudentTerminalComponent
+                formData={formData}
+                onChange={handleStudentFormChange}
+                onSubmit={handleStudentSubmit}
+                submitStatus={submitStatus}
+                isExamActive={isExamActive}
+                activeBatches={activeBatches}
+                isSheetyReachable={isDatabaseReachable}
+                checkingConnection={checkingConnection}
+                onRetryConnection={checkDatabaseReachability}
+                questions={QUESTIONS}
+              />
+            }
           />
         )}
       </main>
