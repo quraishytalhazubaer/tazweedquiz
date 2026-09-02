@@ -121,7 +121,8 @@ function TeacherDashboard({
       </div>
 
       {/* Filters and Exports Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="sticky top-20 z-20 -mx-4 px-4 py-3 bg-slate-50/95 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Search */}
         <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex items-center">
           <span className="absolute left-3.5 text-slate-400">
@@ -184,6 +185,7 @@ function TeacherDashboard({
             <FileText className="h-4 w-4" /> Summary PDF
           </button>
         </div>
+        </div>
       </div>
 
       {/* Selection Notification Bar */}
@@ -203,10 +205,9 @@ function TeacherDashboard({
       )}
 
       {/* Submissions Table */}
-      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
+      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm max-h-[calc(100vh-14rem)] overflow-auto">
+        <table className="w-full text-left border-collapse">
+            <thead className="sticky top-0 z-10">
               <tr className="bg-slate-50 border-b border-slate-150 text-xs font-bold uppercase text-slate-500 tracking-wider">
                 <th className="py-4 px-6 text-center w-12">
                   <input
@@ -346,8 +347,7 @@ function TeacherDashboard({
                 })
               )}
             </tbody>
-          </table>
-        </div>
+        </table>
       </div>
     </div>
   )

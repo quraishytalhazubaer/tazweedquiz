@@ -414,19 +414,30 @@ export default function App() {
     }
   };
 
-  const handleUpdateMarks = async (submissionId, newMarks) => {
+  const handleUpdateMarks = async (submissionId, newMarks, identityChanges = {}) => {
     setSavingMarks(true);
     const parsedMarks = parseFloat(newMarks);
 
     try {
       const { error } = await supabase
         .from('submissions')
-        .update({ marks: parsedMarks })
+        .update({
+          marks: parsedMarks,
+          user_name: identityChanges.userName,
+          user_branch: identityChanges.userBranch,
+          designation: identityChanges.designation,
+        })
         .eq('id', submissionId);
 
       if (error) throw error;
 
-      setSubmissions(prev => prev.map(s => s.id === submissionId ? { ...s, marks: parsedMarks } : s));
+      setSubmissions(prev => prev.map(s => s.id === submissionId ? {
+        ...s,
+        marks: parsedMarks,
+        userName: identityChanges.userName,
+        userBranch: identityChanges.userBranch,
+        designation: identityChanges.designation,
+      } : s));
       setGradingSubmission(null);
       triggerNotification("শিক্ষার্থীর প্রাপ্ত নম্বর সফলভাবে সেভ করা হয়েছে।", "success");
     } catch (err) {
@@ -438,7 +449,7 @@ export default function App() {
   };
 
   const handleUpdateVivaMarks = async (submissionId, vivaValue) => {
-    const numericViva = vivaValue === '' ? 0 : parseFloat(vivaValue);
+    const numericViva = vivaValue === '' ? null : parseFloat(vivaValue);
 
     // Find target submission to sum existing `marks` + `viva_marks`
     const targetSub = submissions.find((s) => s.id === submissionId);
@@ -447,10 +458,9 @@ export default function App() {
         ? parseFloat(targetSub.marks)
         : 0;
 
-    const calculatedTotal = numericViva !== null ? existingMarks + numericViva : existingMarks;
-    
-    // Set status to 'Graded' if viva marks exist, otherwise keep existing status or set 'Evaluated'
-    const newStatus = numericViva !== null ? 'Graded' : (targetSub?.status || 'Evaluated');
+    const calculatedTotal = numericViva !== null && !Number.isNaN(numericViva)
+      ? existingMarks + numericViva
+      : existingMarks;
 
     // 1. Update React Local State
     setSubmissions((prev) =>
@@ -458,11 +468,10 @@ export default function App() {
         sub.id === submissionId
           ? {
               ...sub,
-              viva_marks: numericViva,
-              vivaMarks: numericViva,
+              viva_marks: vivaValue,
+              vivaMarks: vivaValue,
               total_marks: calculatedTotal,
               totalMarks: calculatedTotal,
-              status: newStatus,
             }
           : sub
       )
@@ -475,7 +484,6 @@ export default function App() {
         .update({
           viva_marks: numericViva,
           total_marks: calculatedTotal,
-          status: newStatus,
         })
         .eq('id', submissionId);
 

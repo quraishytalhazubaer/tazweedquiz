@@ -1,14 +1,41 @@
 import { useEffect, useState } from 'react'
-import { AlertCircle, CheckCircle2, ChevronLeft, Loader2, Save, XCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle2, ChevronLeft, Edit3, Loader2, Save, X, XCircle } from 'lucide-react'
 
 function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }) {
   const [overrideMarks, setOverrideMarks] = useState('')
+  const [isIdentityEditing, setIsIdentityEditing] = useState(false)
+  const [identityDraft, setIdentityDraft] = useState(() => ({
+    userName: submission?.userName ,
+    userBranch: submission?.userBranch ,
+    designation: submission?.designation,
+  }))
 
   useEffect(() => {
     if (submission?.marks !== undefined) {
       setOverrideMarks(submission.marks)
     }
+    if (submission) {
+      setIdentityDraft({
+        userName: submission.userName || '',
+        userBranch: submission.userBranch || '',
+        designation: submission.designation || '',
+      })
+    }
+    setIsIdentityEditing(false)
   }, [submission])
+
+  const updateIdentityDraft = (field, value) => {
+    setIdentityDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  const cancelIdentityEditing = () => {
+    setIdentityDraft({
+      userName: submission.userName || '',
+      userBranch: submission.userBranch || '',
+      designation: submission.designation || '',
+    })
+    setIsIdentityEditing(false)
+  }
 
   let autoGradedMarks = 0
   const matchDetails = questions.map((q, i) => {
@@ -35,17 +62,47 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
         </button>
 
         <h3 className="text-lg font-black text-slate-950">
-          {submission.userName} এর উত্তরপত্র ও মূল্যায়ন
+          {identityDraft.userName || 'শিক্ষার্থী'} এর উত্তরপত্র ও মূল্যায়ন
         </h3>
 
-        <div className="w-24 hidden md:block"></div>
+        <div className="flex items-center gap-2">
+          {isIdentityEditing && (
+            <button
+              type="button"
+              onClick={cancelIdentityEditing}
+              className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              title="পরিবর্তন বাতিল করুন"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (!isIdentityEditing) setIsIdentityEditing(true)
+            }}
+            className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition"
+          >
+            <Edit3 className="h-4 w-4" />
+            {isIdentityEditing ? 'এডিটিং চলছে' : 'এডিট করুন'}
+          </button>
+        </div>
       </div>
 
       <div className="bg-slate-900 text-white rounded-[2rem] p-6 md:p-8 shadow-md">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div>
             <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">পরীক্ষার্থীর নাম</span>
-            <h4 className="text-lg font-bold mt-0.5">{submission.userName}</h4>
+            {isIdentityEditing ? (
+              <input
+                type="text"
+                value={identityDraft.userName}
+                onChange={(e) => updateIdentityDraft('userName', e.target.value)}
+                className="w-full mt-1 px-2 py-1 text-sm font-bold text-base rounded-lg"
+              />
+            ) : (
+              <h4 className="text-lg font-bold mt-0.5">{identityDraft.userName || '---'}</h4>
+            )}
           </div>
           <div>
             <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">স্টুডেন্ট আইডি (রোল)</span>
@@ -53,9 +110,31 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
           </div>
           <div>
             <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">শাখা / শাখা কার্যালয়</span>
-            <p className="text-base font-semibold mt-0.5">{submission.userBranch || '---'}</p>
+            {isIdentityEditing ? (
+              <input
+                type="text"
+                value={identityDraft.userBranch}
+                onChange={(e) => updateIdentityDraft('userBranch', e.target.value)}
+                className="w-full mt-1 px-2 py-1 text-sm font-semibold text-base rounded-lg"
+              />
+            ) : (
+              <p className="text-base font-semibold mt-0.5">{identityDraft.userBranch || '---'}</p>
+            )}
           </div>
           <div>
+            <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">পদবি</span>
+            {isIdentityEditing ? (
+              <input
+                type="text"
+                value={identityDraft.designation}
+                onChange={(e) => updateIdentityDraft('designation', e.target.value)}
+                className="w-full mt-1 px-2 py-1 text-sm font-semibold text-base rounded-lg"
+              />
+            ) : (
+              <p className="text-base font-semibold mt-0.5">{identityDraft.designation || '---'}</p>
+            )}
+          </div>
+          <div className="md:col-start-5 md:text-right">
             <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">অটো-গ্রেডেড স্কোর</span>
             <p className="text-lg font-extrabold mt-0.5 text-emerald-300">{autoGradedMarks} / 10</p>
           </div>
@@ -128,7 +207,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
         </div>
 
         <button
-          onClick={() => onSaveMarks(submission.id, overrideMarks)}
+          onClick={() => onSaveMarks(submission.id, overrideMarks, identityDraft)}
           disabled={saving}
           className="w-full md:w-auto px-8 py-3.5 bg-[#1B4D1A] hover:bg-emerald-800 active:bg-emerald-950 text-white font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2 text-sm"
         >
