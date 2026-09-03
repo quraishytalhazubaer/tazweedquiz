@@ -5,6 +5,15 @@ import { supabase } from '../supabaseClient'
 const emptyMaterial = { category: '', type: '', title: '', subtitle: '', description: '', duration: '', action: '' }
 const iconByType = { DOCUMENT: FileText, 'AUDIO LESSON': PlayCircle, MANUAL: BookOpen }
 
+const getMaterialUrl = (value) => {
+  try {
+    const url = new URL(value)
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : null
+  } catch {
+    return null
+  }
+}
+
 function CourseMaterials({ onNotify, canManage = false }) {
   const [materials, setMaterials] = useState([])
   const [loading, setLoading] = useState(true)
@@ -69,13 +78,14 @@ function CourseMaterials({ onNotify, canManage = false }) {
                 <p className="text-sm text-slate-600 bg-slate-50 border border-slate-100 rounded-2xl p-4 mt-5 leading-relaxed">{material.description}</p>
                 <div className="flex items-center justify-between gap-3 mt-5">
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-400"><Clock3 className="h-4 w-4" /> {material.duration}</span>
-                  <button
-                    type="button"
-                    onClick={() => onNotify(`${material.title} শীঘ্রই যুক্ত করা হবে।`, 'success')}
+                  {getMaterialUrl(material.action) && <a
+                    href={getMaterialUrl(material.action)}
+                    target="_blank"
+                    rel="noreferrer"
                     className="flex items-center gap-1.5 text-xs font-black text-emerald-700 hover:text-emerald-900"
                   >
-                    <Icon className="h-4 w-4" /> {material.action}
-                  </button>
+                    <Icon className="h-4 w-4" /> লিংক খুলুন
+                  </a>}
                   {canManage && <span className="flex gap-2"><button type="button" onClick={() => setEditingMaterial(material)} title="এডিট"><Pencil className="h-4 w-4 text-slate-500" /></button><button type="button" onClick={() => deleteMaterial(material.id)} title="ডিলিট"><Trash2 className="h-4 w-4 text-rose-500" /></button></span>}
                 </div>
               </article>
@@ -83,7 +93,7 @@ function CourseMaterials({ onNotify, canManage = false }) {
           })}
         </div>
       </div>
-      {canManage && editingMaterial && <div className="fixed inset-0 z-40 bg-slate-950/40 flex items-center justify-center p-4"><form onSubmit={saveMaterial} className="w-full max-w-2xl bg-white rounded-3xl p-6 space-y-4"><div className="flex justify-between items-center"><h3 className="text-xl font-black">মেটেরিয়াল {editingMaterial.id ? 'এডিট' : 'যুক্ত করুন'}</h3><button type="button" onClick={() => setEditingMaterial(null)}><X /></button></div><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{Object.keys(emptyMaterial).map((field) => <input key={field} required={['title', 'description'].includes(field)} value={editingMaterial[field] || ''} onChange={(event) => setEditingMaterial((current) => ({ ...current, [field]: event.target.value }))} placeholder={field} className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" />)}</div><button type="submit" className="flex items-center gap-2 px-5 py-3 bg-emerald-700 text-white rounded-xl text-sm font-bold"><CheckCircle2 className="h-4 w-4" /> সংরক্ষণ করুন</button></form></div>}
+      {canManage && editingMaterial && <div className="fixed inset-0 z-40 bg-slate-950/40 flex items-center justify-center p-4"><form onSubmit={saveMaterial} className="w-full max-w-2xl bg-white rounded-3xl p-6 space-y-4"><div className="flex justify-between items-center"><h3 className="text-xl font-black">মেটেরিয়াল {editingMaterial.id ? 'এডিট' : 'যুক্ত করুন'}</h3><button type="button" onClick={() => setEditingMaterial(null)}><X /></button></div><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{Object.keys(emptyMaterial).map((field) => <input key={field} type={field === 'action' ? 'url' : 'text'} required={['title', 'description'].includes(field)} value={editingMaterial[field] || ''} onChange={(event) => setEditingMaterial((current) => ({ ...current, [field]: event.target.value }))} placeholder={field === 'action' ? 'https://example.com' : field} className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" />)}</div><button type="submit" className="flex items-center gap-2 px-5 py-3 bg-emerald-700 text-white rounded-xl text-sm font-bold"><CheckCircle2 className="h-4 w-4" /> সংরক্ষণ করুন</button></form></div>}
     </section>
   )
 }
