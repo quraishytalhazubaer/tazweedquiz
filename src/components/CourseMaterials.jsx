@@ -46,14 +46,15 @@ function CourseMaterials({ onNotify, canManage = false }) {
           <h2 className="text-2xl md:text-3xl font-black text-slate-950 mt-2">কোর্স মেটেরিয়াল ও অধ্যয়নপত্র</h2>
           <p className="text-sm text-slate-600 mt-2 max-w-2xl leading-relaxed">তাজবিদ মূল্যায়নের আগে প্রয়োজনীয় পাঠ, নিয়ম এবং ব্যবহারিক অনুশীলনগুলো এখান থেকে দেখে নিন।</p>
         </div>
-        <div className="shrink-0 flex items-center gap-2 text-sm font-bold text-emerald-800 bg-white px-4 py-3 rounded-2xl border border-emerald-100">
+        <div className="shrink-0 flex items-center gap-2">
+          {canManage && <button type="button" onClick={() => setEditingMaterial(emptyMaterial)} className="flex items-center gap-2 px-4 py-3 bg-emerald-700 text-white rounded-2xl text-xs font-bold"><Plus className="h-4 w-4" /> নতুন মেটেরিয়াল</button>}
+          <div className="flex items-center gap-2 text-sm font-bold text-emerald-800 bg-white px-4 py-3 rounded-2xl border border-emerald-100">
           <CheckCircle2 className="h-5 w-5" /> {materials.length}টি পাঠ প্রস্তুত
+          </div>
         </div>
       </div>
 
       <div>
-        <h3 className="text-xl font-black text-slate-950">কোর্স মেটেরিয়াল</h3>
-        {canManage && <button type="button" onClick={() => setEditingMaterial(emptyMaterial)} className="mt-3 flex items-center gap-2 px-4 py-2.5 bg-emerald-700 text-white rounded-xl text-xs font-bold"><Plus className="h-4 w-4" /> নতুন মেটেরিয়াল</button>}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 mt-4">
           {loading ? <p className="text-sm text-slate-500">মেটেরিয়াল লোড হচ্ছে...</p> : materials.map((material) => {
             const Icon = iconByType[material.type] || BookOpen

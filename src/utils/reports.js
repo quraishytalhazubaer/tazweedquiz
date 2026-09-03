@@ -172,37 +172,45 @@ export const generateSummaryPDF = async (submissions, notify) => {
   }
 };
 
-// --- 3. Robust Individual & Bulk Profiles Engine (Guaranteed Layout Painting) ---
-export const generateIndividualPDF = (dataArray, notify) => {
-  const html2pdf = window.html2pdf;
-  if (!html2pdf) {
-    notify("পিডিএফ লাইব্রেরি এখনো লোড হয়নি। দয়া করে কিছুক্ষণ অপেক্ষা করুন।", "error");
+export const generateIndividualPDF = async (dataArray, notify) => {
+  if (!dataArray || dataArray.length === 0) {
+    notify("ডাউনলোড করার মতো কোনো তথ্য নেই।", "error");
     return;
   }
+
   const container = document.createElement("div");
+  // Set clear box-sizing and explicit A4 width in pixels at standard 96 DPI
+  container.style.width = "794px";
+  container.style.boxSizing = "border-box";
+  container.style.margin = "0 auto";
+  container.style.backgroundColor = "#fff";
   document.body.appendChild(container);
 
   dataArray.forEach((sub, index) => {
     const page = document.createElement("div");
+    page.style.width = "794px";
+    page.style.boxSizing = "border-box";
     page.style.padding = "25px";
     if (index < dataArray.length - 1) page.style.pageBreakAfter = "always";
+    
     page.innerHTML = `
-        <div style="border: 3px solid #1B4D1A; border-radius: 12px; padding: 25px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; position: relative; min-height: 262mm; background-color: #fff; box-shadow: inset 0 0 20px rgba(27,77,26,0.05);">
+        <div style="border: 3px solid #1B4D1A; border-radius: 12px; padding: 25px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; position: relative; min-height: 262mm; box-sizing: border-box; background-color: #fff; box-shadow: inset 0 0 20px rgba(27,77,26,0.05);">
             <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px;">
                 <h1 style="font-size: 18px; margin: 0; color: #1B4D1A; font-weight: 900; text-transform: uppercase;">Islami Bank Training and Research Academy</h1>
                 <p style="font-size: 10px; color: #4b5563; margin-top: 2px; font-weight: bold;">13A/2A, Block # B, Babar Road, Mohammadpur, Dhaka-1207</p>
                 <h2 style="font-size: 14px; margin: 10px 0; color: #111827; font-weight: bold; background: #f0fdf4; display: inline-block; padding: 5px 15px; border-radius: 20px; border: 1px solid #1B4D1A;">Tajweed Quiz Evaluation Report</h2>
             </div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; background: #f9fafb; padding: 12px; border-radius: 8px; border: 1px solid #f3f4f6; font-size: 11px;">
-                <div>
-                    <p style="margin: 2px 0;"><strong>Student Name:</strong> <span style="color: #111827; font-weight: bold;">${sub.userName}</span></p>
-                    <p style="margin: 2px 0;"><strong>Student ID:</strong> <span style="font-family: monospace; font-weight: bold;">${sub.userId}</span></p>
+            <!-- Replaced CSS Grid with a robust Flex layout for HTML2Canvas compatibility -->
+            <div style="display: flex; justify-content: space-between; gap: 15px; margin-bottom: 20px; background: #f9fafb; padding: 12px; border-radius: 8px; border: 1px solid #f3f4f6; font-size: 11px; box-sizing: border-box;">
+                <div style="flex: 1;">
+                    <p style="margin: 2px 0;"><strong>Student Name:</strong> <span style="color: #111827; font-weight: bold;">${sub.userName || ''}</span></p>
+                    <p style="margin: 2px 0;"><strong>Student ID:</strong> <span style="font-family: monospace; font-weight: bold;">${sub.userId || ''}</span></p>
                     <p style="margin: 2px 0;"><strong>Branch:</strong> ${sub.userBranch || 'Not Specified'}</p>
                 </div>
-                <div style="text-align: right;">
+                <div style="flex: 1; text-align: right;">
                     <p style="margin: 2px 0;"><strong>Evaluation Date:</strong> ${sub.date || new Date().toLocaleDateString()}</p>
-                    <p style="margin: 2px 0; font-size: 13px;"><strong>Score Secured:</strong> <span style="font-size: 16px; font-weight: bold; color: #1B4D1A;">${sub.marks || 0}</span> / 100</p>
+                    <p style="margin: 2px 0; font-size: 13px;"><strong>Score Secured:</strong> <span style="font-size: 16px; font-weight: bold; color: #1B4D1A;">${sub.marks || 0}</span> / 10</p>
                 </div>
             </div>
 
@@ -215,7 +223,7 @@ export const generateIndividualPDF = (dataArray, notify) => {
                   return `
                     <div style="margin-bottom: 8px; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px; font-size: 10px; line-height: 1.4;">
                         <p style="font-weight: bold; color: #374151; margin: 0 0 3px 0;">Q${i+1}: ${q.question}</p>
-                        <div style="display: flex; flex-direction: column; gap: 2px; padding: 5px; border-radius: 4px; background: ${isCorrect ? '#f0fdf4' : '#fef2f2'}; border-left: 3px solid ${isCorrect ? '#10b981' : '#ef4444'};">
+                        <div style="display: block; padding: 5px; border-radius: 4px; background: ${isCorrect ? '#f0fdf4' : '#fef2f2'}; border-left: 3px solid ${isCorrect ? '#10b981' : '#ef4444'}; box-sizing: border-box;">
                             <p style="margin: 0; color: #1f2937;"><strong>Given Choice:</strong> ${studentAnswer || '<span style="color:#ef4444; font-weight: bold;">No response recorded</span>'}</p>
                             ${!isCorrect ? `<p style="margin: 1px 0 0 0; color: #1B4D1A;"><strong>Expected Key:</strong> ${q.correctAnswer}</p>` : ''}
                         </div>
@@ -234,15 +242,32 @@ export const generateIndividualPDF = (dataArray, notify) => {
   });
 
   const opt = {
-    margin: 10,
+    margin: 0,
     filename: `Tajweed_Individual_Report_${Date.now()}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
+    html2canvas: {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      scrollX: 0,
+      scrollY: 0,
+      width: 794,
+      windowWidth: 794,
+      x: 0
+    },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
-  html2pdf().from(container).set(opt).save().then(() => {
+  try {
+    await loadAllPdfLibraries();
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+    await window.html2pdf().from(container).set(opt).save();
     document.body.removeChild(container);
-    notify("ব্যক্তিগত পিডিএফ সফলভাবে ডাউনলোড হয়েছে।", "success");
-  });
+    notify("ব্যক্তিগত পিডিএফ সফলভাবে ডাউনলোড হয়েছে।", "success");
+  } catch (err) {
+    console.error('Individual PDF Engine Crash Log:', err);
+    if (container.parentNode) container.parentNode.removeChild(container);
+    notify("ব্যক্তিগত পিডিএফ তৈরি করা যায়নি।", "error");
+  }
 };
