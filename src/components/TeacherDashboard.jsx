@@ -23,6 +23,7 @@ function TeacherDashboard({
   setSelectedReportBatch,
   onGenerateSummaryPDF,
   onGenerateIndividualPDF,
+  onManageUsers,
 }) {
   const branches = Array.from(new Set(submissions.map((sub) => sub.userBranch).filter(Boolean)))
 
@@ -96,6 +97,10 @@ function TeacherDashboard({
             title="Settings"
           >
             <Settings className="h-4 w-4" /> Settings
+          </button>
+
+          <button onClick={onManageUsers} className="p-3 bg-slate-50 hover:bg-slate-150 text-slate-700 rounded-2xl border border-slate-200 transition-all flex items-center gap-2 font-bold text-xs" title="User management">
+            <ShieldCheck className="h-4 w-4" /> Users
           </button>
 
           <button

@@ -79,16 +79,9 @@ function LoginView({ onLogin, teacherPassword }) {
 
         if (signUpError) throw signUpError
 
-        if (data.user && data.session) {
-          onLogin({ 
-            role: isTeacher ? 'teacher' : 'student', 
-            name: data.user.user_metadata.full_name, 
-            user: data.user 
-          })
-        } else {
-          setMessage('নিবন্ধন সফল হয়েছে! আপনার অ্যাকাউন্ট নিশ্চিত করতে ইমেইল চেক করুন।')
-          setIsRegistering(false)
-        }
+        if (data.session) await supabase.auth.signOut()
+        setMessage('নিবন্ধন সফল হয়েছে। Admin approval পাওয়ার পর আপনি login করতে পারবেন।')
+        setIsRegistering(false)
 
       } else {
         // --- LOGIN LOGIC ---
@@ -103,13 +96,18 @@ function LoginView({ onLogin, teacherPassword }) {
         // 2. Query user profile record from the profiles table
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('role, full_name')
+          .select('role, full_name, approved')
           .eq('id', authData.user.id)
           .single()
 
         if (profileError) {
           await supabase.auth.signOut()
           throw new Error('ব্যবহারকারীর প্রোফাইল ডাটাবেসে পাওয়া যায়নি।')
+        }
+
+        if (!profile.approved) {
+          await supabase.auth.signOut()
+          throw new Error('আপনার account এখনো admin approve করেননি।')
         }
 
         // 3. Verify user's database role matches current UI portal tab

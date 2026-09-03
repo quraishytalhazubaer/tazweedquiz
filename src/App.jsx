@@ -36,6 +36,7 @@ import LoginViewComponent from './components/LoginView';
 import StudentTerminalComponent from './components/StudentTerminal';
 import StudentPortal from './components/StudentPortal';
 import CourseMaterials from './components/CourseMaterials';
+import AdminUserManagement from './components/AdminUserManagement';
 import TeacherDashboardComponent from './components/TeacherDashboard';
 import GradingWorkspaceComponent from './components/GradingWorkspace';
 import ConfigModal from './components/SettingsModal';
@@ -76,6 +77,7 @@ export default function App() {
   const [activeBatches, setActiveBatches] = useState([]);
   const [allBatches, setAllBatches] = useState([]); // Master list of all batches
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [showUserManagement, setShowUserManagement] = useState(false);
   const [isDatabaseReachable, setIsDatabaseReachable] = useState(null); 
   const [checkingConnection, setCheckingConnection] = useState(true);
 
@@ -133,13 +135,13 @@ export default function App() {
 
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role, full_name')
+        .select('role, full_name, approved')
         .eq('id', session.user.id)
         .single();
 
       if (!isMounted) return;
 
-      if (error || !profile) {
+      if (error || !profile || !profile.approved) {
         console.error('Failed to restore user profile:', error);
         setUser(null);
       } else {
@@ -667,6 +669,7 @@ export default function App() {
             />
           ) : (
             <>
+            {showUserManagement ? <AdminUserManagement onNotify={triggerNotification} onBack={() => setShowUserManagement(false)} /> : <>
             <CourseMaterials canManage onNotify={triggerNotification} />
             <TeacherDashboardComponent 
               submissions={submissions}
@@ -691,6 +694,7 @@ export default function App() {
               onExportExcel={handleExportExcel}
               onGenerateSummaryPDF={generateSummaryPDF}
               onGenerateIndividualPDF={generateIndividualPDF}
+              onManageUsers={() => setShowUserManagement(true)}
             />
             {/* Settings Configuration Modal */}
               <ConfigModal
@@ -703,6 +707,7 @@ export default function App() {
                 onToggleAllGraded={handleToggleAllGraded}
                 triggerNotification={triggerNotification}
               />
+            </>}
             </>
 
           )
