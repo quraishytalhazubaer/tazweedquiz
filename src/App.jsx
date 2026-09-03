@@ -235,13 +235,21 @@ export default function App() {
         return;
       }
 
-      setStudentProfile({
+      const syncedProfile = {
         name: data.full_name || user.name || metadata.full_name || '',
         employeeId: data.employee_id || data.employeeId || metadata.employee_id || '',
         designation: data.designation || metadata.designation || '',
         branch: data.branch || data.user_branch || metadata.branch || '',
         phone: data.phone || metadata.phone || '',
-      });
+      };
+      setStudentProfile(syncedProfile);
+      setFormData((current) => ({
+        ...current,
+        userName: syncedProfile.name,
+        userId: syncedProfile.employeeId,
+        designation: syncedProfile.designation,
+        userBranch: syncedProfile.branch,
+      }));
     };
 
     loadStudentProfile();
@@ -302,7 +310,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from('submissions')
-        .select('*')
+        .select('*, profile:profiles(full_name, employee_id, branch, designation)')
         .order('id', { ascending: false });
 
       if (error) throw error;
@@ -310,10 +318,11 @@ export default function App() {
       // Flatten structured jsonb answer payloads to remain backward compatible with report utilities
       const mappedList = (data || []).map(row => ({
         id: row.id,
-        userName: row.user_name,
-        userId: row.user_id,
-        userBranch: row.user_branch,
-        designation: row.designation,
+        profileId: row.profile_id,
+        userName: row.profile?.full_name || row.user_name,
+        userId: row.profile?.employee_id || row.user_id,
+        userBranch: row.profile?.branch || row.user_branch,
+        designation: row.profile?.designation || row.designation,
         batch: row.batch,
         status: row.status,
         marks: row.marks,
@@ -377,7 +386,7 @@ export default function App() {
       const { data: existingSubmission, error: checkError } = await supabase
         .from("submissions")
         .select("id")
-        .eq("user_id", formData.userId)
+        .eq("profile_id", user.user.id)
         .maybeSingle();
 
       if (checkError) {
@@ -405,10 +414,7 @@ export default function App() {
       const { error: insertError } = await supabase
         .from('submissions')
         .insert([{
-          user_name: formData.userName,
-          user_id: formData.userId,
-          user_branch: formData.userBranch,
-          designation: formData.designation,
+          profile_id: user.user.id,
           batch: formData.batch || '',
           marks: score,
           answers: answersPayload,
@@ -455,7 +461,7 @@ export default function App() {
     }
   };
 
-  const handleUpdateMarks = async (submissionId, newMarks, identityChanges = {}) => {
+  const handleUpdateMarks = async (submissionId, newMarks) => {
     setSavingMarks(true);
     const parsedMarks = parseFloat(newMarks);
 
@@ -464,9 +470,6 @@ export default function App() {
         .from('submissions')
         .update({
           marks: parsedMarks,
-          user_name: identityChanges.userName,
-          user_branch: identityChanges.userBranch,
-          designation: identityChanges.designation,
         })
         .eq('id', submissionId);
 
@@ -475,9 +478,6 @@ export default function App() {
       setSubmissions(prev => prev.map(s => s.id === submissionId ? {
         ...s,
         marks: parsedMarks,
-        userName: identityChanges.userName,
-        userBranch: identityChanges.userBranch,
-        designation: identityChanges.designation,
       } : s));
       setGradingSubmission(null);
       triggerNotification("শিক্ষার্থীর প্রাপ্ত নম্বর সফলভাবে সেভ করা হয়েছে।", "success");
@@ -626,6 +626,13 @@ export default function App() {
 
       localStorage.setItem('studentProfile', JSON.stringify(profile));
       setStudentProfile(profile);
+      setFormData((current) => ({
+        ...current,
+        userName: profile.name,
+        userId: profile.employeeId,
+        designation: profile.designation,
+        userBranch: profile.branch,
+      }));
       setUser((current) => ({ ...current, name: profile.name }));
       triggerNotification('প্রোফাইল সফলভাবে আপডেট করা হয়েছে।', 'success');
     } catch (error) {

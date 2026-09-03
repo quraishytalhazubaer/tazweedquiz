@@ -75,7 +75,7 @@ function CourseMaterials({ onNotify, canManage = false }) {
                 </div>
                 <h4 className="text-lg font-black text-slate-900 mt-5 leading-snug">{material.title}</h4>
                 <p className="text-xs italic text-slate-400 mt-1">{material.subtitle}</p>
-                <p className="text-sm text-slate-600 bg-slate-50 border border-slate-100 rounded-2xl p-4 mt-5 leading-relaxed">{material.description}</p>
+                <p className="text-sm text-slate-600 bg-slate-50 border border-slate-100 rounded-2xl p-4 mt-5 leading-relaxed text-justify">{material.description}</p>
                 <div className="flex items-center justify-between gap-3 mt-5">
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-400"><Clock3 className="h-4 w-4" /> {material.duration}</span>
                   {getMaterialUrl(material.action) && <a
