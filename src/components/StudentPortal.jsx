@@ -1,4 +1,4 @@
-import { BookOpen, ClipboardCheck, Menu, Pencil, QrCode, UserRound, X } from 'lucide-react'
+import { BookOpen, CheckCircle2, ClipboardCheck, KeyRound, Menu, Pencil, QrCode, UserRound, X } from 'lucide-react'
 import { useState } from 'react'
 import CourseMaterials from './CourseMaterials'
 import ProfileEdit from './ProfileEdit'
@@ -10,13 +10,33 @@ const navigation = [
   { id: 'profile', label: 'প্রোফাইল এডিট', icon: Pencil },
 ]
 
-function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify, activeBatches = [] }) {
+const getLocalDateKey = () => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, onAttendanceSubmit }) {
   const [activeView, setActiveView] = useState('materials')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [attendanceCode, setAttendanceCode] = useState('')
+  const [attendanceSaving, setAttendanceSaving] = useState(false)
 
   const selectView = (view) => {
     setActiveView(view)
     setIsDrawerOpen(false)
+  }
+
+  const submitAttendance = async (event) => {
+    event.preventDefault()
+    setAttendanceSaving(true)
+    try {
+      await onAttendanceSubmit(attendanceCode)
+      setAttendanceCode('')
+    } catch (error) {
+      onNotify(error.message || 'হাজিরা দেওয়া যায়নি।', 'error')
+    } finally {
+      setAttendanceSaving(false)
+    }
   }
 
   const navigationContent = (
@@ -61,7 +81,15 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
           <section className="bg-white rounded-3xl border border-slate-200/70 shadow-sm p-8 text-center animate-slide-in">
             <QrCode className="h-12 w-12 mx-auto text-emerald-700 mb-4" />
             <h2 className="text-2xl font-black text-slate-950">হাজিরা প্রদান</h2>
-            <p className="text-sm text-slate-500 mt-2">হাজিরা সেশন চালু হলে এখানে উপস্থিতি দেওয়া যাবে।</p>
+            {attendance.isActive && attendance.date === getLocalDateKey() ? (
+              <form onSubmit={submitAttendance} className="max-w-sm mx-auto mt-6 space-y-4">
+                <p className="text-sm text-slate-500">শিক্ষকের কাছ থেকে আজকের কোড নিয়ে নিচে লিখুন।</p>
+                <div className="relative"><KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" /><input required value={attendanceCode} onChange={(event) => setAttendanceCode(event.target.value.toUpperCase())} placeholder="20260906-1030-A7K2" className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
+                <button disabled={attendanceSaving} className="w-full py-3 rounded-2xl bg-emerald-700 text-white font-bold disabled:opacity-60">{attendanceSaving ? 'জমা হচ্ছে...' : 'আজকের হাজিরা দিন'}</button>
+              </form>
+            ) : (
+              <div className="mt-6 text-slate-500"><CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-slate-300" /><p className="text-sm">আজকের হাজিরা সেশন এখনো চালু হয়নি।</p></div>
+            )}
           </section>
         )}
       </main>

@@ -36,6 +36,8 @@ import LoginViewComponent from './components/LoginView';
 import StudentTerminalComponent from './components/StudentTerminal';
 import StudentPortal from './components/StudentPortal';
 import CourseMaterials from './components/CourseMaterials';
+import AttendancePanel from './components/AttendancePanel';
+import TeacherNavigation from './components/TeacherNavigation';
 import AdminUserManagement from './components/AdminUserManagement';
 import TeacherDashboardComponent from './components/TeacherDashboard';
 import GradingWorkspaceComponent from './components/GradingWorkspace';
@@ -48,6 +50,20 @@ import { handleExportExcel, generateSummaryPDF, generateIndividualPDF } from './
 // ============================================================================
 const TEACHER_PASSWORD = "admin786";
 const STUDENT_ACCESS_CODE = "ibtra2024";
+
+const getLocalDateKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const generateAttendanceCode = () => {
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${getLocalDateKey(now).replaceAll('-', '')}-${time}-${random}`;
+};
 
 // ============================================================================
 // 2. APP HELPERS
@@ -74,10 +90,11 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isExamActive, setIsExamActive] = useState(true);
+  const [attendance, setAttendance] = useState({ isActive: false, code: '', date: '', generatedAt: null });
   const [activeBatches, setActiveBatches] = useState([]);
   const [allBatches, setAllBatches] = useState([]); // Master list of all batches
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [showUserManagement, setShowUserManagement] = useState(() => sessionStorage.getItem('teacherView') === 'users');
+  const [teacherPage, setTeacherPage] = useState(() => sessionStorage.getItem('teacherPage') || (sessionStorage.getItem('teacherView') === 'users' ? 'users' : 'exam'));
   const [isDatabaseReachable, setIsDatabaseReachable] = useState(null); 
   const [checkingConnection, setCheckingConnection] = useState(true);
 
@@ -98,6 +115,8 @@ export default function App() {
 
   // Teacher dashboard state
   const [submissions, setSubmissions] = useState([]);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,18 +223,28 @@ export default function App() {
       .channel('public:exam_config')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'exam_config', filter: 'id=eq.1' }, (payload) => {
         setIsExamActive(payload.new.is_active);
+        setAttendance({
+          isActive: Boolean(payload.new.attendance_is_active),
+          code: payload.new.attendance_code || '',
+          date: payload.new.attendance_date || '',
+          generatedAt: payload.new.attendance_generated_at || null,
+        });
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance_records' }, () => {
+        if (user?.role === 'teacher') fetchAttendanceRecords();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(configChannel);
     };
-  }, []);
+  }, [user]);
 
   // 2. Automated data fetching upon teacher verification updates
   useEffect(() => {
     if (user?.role === 'teacher') {
       fetchSubmissions();
+      fetchAttendanceRecords();
     }
   }, [user]);
 
@@ -262,7 +291,7 @@ export default function App() {
       try {
         const { data, error } = await supabase
           .from('exam_config')
-          .select('active_batches, all_batches') // Make sure all_batches is selected
+          .select('active_batches, all_batches, attendance_is_active, attendance_code, attendance_date, attendance_generated_at')
           .eq('id', 1)
           .single();
 
@@ -278,6 +307,12 @@ export default function App() {
           setActiveBatches(active);
           setAllBatches(master);
           setSelectedReportBatch(active[0] || 'All');
+          setAttendance({
+            isActive: Boolean(data.attendance_is_active),
+            code: data.attendance_code || '',
+            date: data.attendance_date || '',
+            generatedAt: data.attendance_generated_at || null,
+          });
         }
       } catch (err) {
         console.error('Error fetching exam config:', err);
@@ -342,6 +377,32 @@ export default function App() {
       triggerNotification("ডাটাবেজ থেকে তথ্য সংগ্রহ করা যায়নি।", "error");
     } finally {
       setLoadingSubmissions(false);
+    }
+  };
+
+  const fetchAttendanceRecords = async () => {
+    setLoadingAttendance(true);
+    try {
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select('id, profile_id, attendance_date, attendance_code, marked_at, profile:profiles(full_name, employee_id, branch)')
+        .eq('attendance_date', getLocalDateKey())
+        .order('marked_at', { ascending: false });
+
+      if (error) throw error;
+
+      setAttendanceRecords((data || []).map((record) => ({
+        id: record.id,
+        name: record.profile?.full_name || '---',
+        employeeId: record.profile?.employee_id || '',
+        branch: record.profile?.branch || '',
+        markedAt: record.marked_at,
+      })));
+    } catch (err) {
+      console.error('Failed to fetch attendance records:', err);
+      triggerNotification('হাজিরার তালিকা লোড করা যায়নি।', 'error');
+    } finally {
+      setLoadingAttendance(false);
     }
   };
 
@@ -482,6 +543,80 @@ export default function App() {
       triggerNotification("অবস্থা পরিবর্তন করা সম্ভব হয়নি।", "error");
     }
   };
+
+  const handleAttendanceUpdate = async (updates, successMessage) => {
+    try {
+      const { data, error } = await supabase
+        .from('exam_config')
+        .update(updates)
+        .eq('id', 1)
+        .select('attendance_is_active, attendance_code, attendance_date, attendance_generated_at')
+        .single();
+
+      if (error) throw error;
+
+      setAttendance({
+        isActive: Boolean(data.attendance_is_active),
+        code: data.attendance_code || '',
+        date: data.attendance_date || '',
+        generatedAt: data.attendance_generated_at || null,
+      });
+      triggerNotification(successMessage, 'success');
+    } catch (err) {
+      console.error('Failed to update attendance:', err);
+      triggerNotification('হাজিরা কনফিগারেশন আপডেট করা যায়নি।', 'error');
+    }
+  };
+
+  const handleToggleAttendance = (newStatus) => handleAttendanceUpdate(
+    { attendance_is_active: newStatus },
+    newStatus ? 'আজকের হাজিরা চালু করা হয়েছে।' : 'আজকের হাজিরা বন্ধ করা হয়েছে।'
+  );
+
+  const handleRegenerateAttendance = () => {
+    const now = new Date();
+    return handleAttendanceUpdate(
+      {
+        attendance_code: generateAttendanceCode(),
+        attendance_date: getLocalDateKey(now),
+        attendance_generated_at: now.toISOString(),
+        attendance_is_active: true,
+      },
+      'আজকের হাজিরা কোড নতুন করে তৈরি হয়েছে।'
+    );
+  };
+
+  const handleStudentAttendance = async (code) => {
+    const { data: config, error: configError } = await supabase
+      .from('exam_config')
+      .select('attendance_is_active, attendance_code, attendance_date')
+      .eq('id', 1)
+      .single();
+
+    if (configError) throw configError;
+    if (!config.attendance_is_active || config.attendance_date !== getLocalDateKey() || config.attendance_code !== code.trim().toUpperCase()) {
+      throw new Error('আজকের হাজিরা কোডটি সঠিক নয় অথবা হাজিরা বন্ধ রয়েছে।');
+    }
+
+    const { error } = await supabase.from('attendance_records').insert({
+      profile_id: user.user.id,
+      attendance_date: config.attendance_date,
+      attendance_code: config.attendance_code,
+    });
+
+    if (error) {
+      if (error.code === '23505') throw new Error('আজকের হাজিরা ইতোমধ্যে নেওয়া হয়েছে।');
+      throw error;
+    }
+
+    triggerNotification('আজকের হাজিরা সফলভাবে দেওয়া হয়েছে।', 'success');
+  };
+
+  useEffect(() => {
+    if (user?.role === 'teacher' && (!attendance.code || attendance.date !== getLocalDateKey())) {
+      handleRegenerateAttendance();
+    }
+  }, [user]);
 
   const handleUpdateMarks = async (submissionId, newMarks) => {
     setSavingMarks(true);
@@ -632,6 +767,16 @@ export default function App() {
     triggerNotification("সফলভাবে লগআউট করা হয়েছে।");
   };
 
+  const handleTeacherPageChange = (page) => {
+    setTeacherPage(page);
+    sessionStorage.setItem('teacherPage', page);
+    if (page === 'users') {
+      sessionStorage.setItem('teacherView', 'users');
+    } else {
+      sessionStorage.removeItem('teacherView');
+    }
+  };
+
   const handleStudentProfileSave = async (profile) => {
     setProfileSaving(true);
     try {
@@ -705,9 +850,27 @@ export default function App() {
             />
           ) : (
             <>
-            {showUserManagement ? <AdminUserManagement onNotify={triggerNotification} onBack={() => { sessionStorage.removeItem('teacherView'); setShowUserManagement(false); }} /> : <>
-            <CourseMaterials canManage onNotify={triggerNotification} />
-            <TeacherDashboardComponent 
+            <TeacherNavigation activePage={teacherPage} onPageChange={handleTeacherPageChange} />
+            {teacherPage === 'materials' && <CourseMaterials canManage onNotify={triggerNotification} />}
+            {teacherPage === 'attendance' && (
+              <AttendancePanel
+                attendance={attendance}
+                attendanceRecords={attendanceRecords}
+                attendanceLoading={loadingAttendance}
+                onToggleAttendance={handleToggleAttendance}
+                onRegenerateAttendance={handleRegenerateAttendance}
+                onRefreshAttendance={fetchAttendanceRecords}
+                onNotify={triggerNotification}
+              />
+            )}
+            {teacherPage === 'users' && (
+              <AdminUserManagement
+                onNotify={triggerNotification}
+                onBack={() => handleTeacherPageChange('exam')}
+              />
+            )}
+            {teacherPage === 'exam' && <>
+              <TeacherDashboardComponent 
               submissions={submissions}
               selectedIds={selectedIds}
               setSelectedIds={setSelectedIds}
@@ -717,6 +880,7 @@ export default function App() {
               onUpdateVivaMarks={handleUpdateVivaMarks}
               isExamActive={isExamActive}
               setIsExamActive={handleToggleExamStatus}
+              showAttendance={false}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               branchFilter={branchFilter}
@@ -730,7 +894,7 @@ export default function App() {
               onExportExcel={handleExportExcel}
               onGenerateSummaryPDF={generateSummaryPDF}
               onGenerateIndividualPDF={generateIndividualPDF}
-              onManageUsers={() => { sessionStorage.setItem('teacherView', 'users'); setShowUserManagement(true); }}
+              onManageUsers={() => handleTeacherPageChange('users')}
             />
             {/* Settings Configuration Modal */}
               <ConfigModal
@@ -745,7 +909,6 @@ export default function App() {
               />
             </>}
             </>
-
           )
         ) : (
           <StudentPortal
@@ -754,6 +917,8 @@ export default function App() {
             profileSaving={profileSaving}
             activeBatches={activeBatches}
             onNotify={triggerNotification}
+            attendance={attendance}
+            onAttendanceSubmit={handleStudentAttendance}
             examView={
               <StudentTerminalComponent
                 formData={formData}

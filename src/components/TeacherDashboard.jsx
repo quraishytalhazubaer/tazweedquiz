@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { CheckSquare, Download, FileText, Loader2, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
+import AttendancePanel from './AttendancePanel'
 
 function TeacherDashboard({
   submissions = [],
@@ -11,6 +11,13 @@ function TeacherDashboard({
   onRefresh,
   isExamActive,
   setIsExamActive,
+  attendance = {},
+  attendanceRecords = [],
+  attendanceLoading = false,
+  showAttendance = true,
+  onToggleAttendance,
+  onRegenerateAttendance,
+  onRefreshAttendance,
   searchQuery,
   setSearchQuery,
   branchFilter,
@@ -124,6 +131,18 @@ function TeacherDashboard({
           </button>
         </div>
       </div>
+
+      {showAttendance && (
+        <AttendancePanel
+          attendance={attendance}
+          attendanceRecords={attendanceRecords}
+          attendanceLoading={attendanceLoading}
+          onToggleAttendance={onToggleAttendance}
+          onRegenerateAttendance={onRegenerateAttendance}
+          onRefreshAttendance={onRefreshAttendance}
+          onNotify={triggerNotification}
+        />
+      )}
 
       {/* Filters and Exports Bar */}
       <div className="sticky top-20 z-20 -mx-4 px-4 py-3 bg-slate-50/95 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
