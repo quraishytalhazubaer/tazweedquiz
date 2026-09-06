@@ -10,7 +10,7 @@ const navigation = [
   { id: 'profile', label: 'প্রোফাইল এডিট', icon: Pencil },
 ]
 
-function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify }) {
+function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify, activeBatches = [] }) {
   const [activeView, setActiveView] = useState('materials')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
@@ -55,7 +55,7 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
           <Menu className="h-5 w-5" /> মেনু খুলুন
         </button>
         {activeView === 'materials' && <CourseMaterials onNotify={onNotify} />}
-        {activeView === 'profile' && <ProfileEdit profile={profile} onSave={onProfileSave} saving={profileSaving} />}
+        {activeView === 'profile' && <ProfileEdit profile={profile} onSave={onProfileSave} saving={profileSaving} activeBatches={activeBatches} />}
         {activeView === 'exam' && examView}
         {activeView === 'attendance' && (
           <section className="bg-white rounded-3xl border border-slate-200/70 shadow-sm p-8 text-center animate-slide-in">

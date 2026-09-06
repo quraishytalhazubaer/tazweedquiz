@@ -77,7 +77,7 @@ export default function App() {
   const [activeBatches, setActiveBatches] = useState([]);
   const [allBatches, setAllBatches] = useState([]); // Master list of all batches
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [showUserManagement, setShowUserManagement] = useState(false);
+  const [showUserManagement, setShowUserManagement] = useState(() => sessionStorage.getItem('teacherView') === 'users');
   const [isDatabaseReachable, setIsDatabaseReachable] = useState(null); 
   const [checkingConnection, setCheckingConnection] = useState(true);
 
@@ -111,6 +111,7 @@ export default function App() {
     designation: '',
     branch: '',
     phone: '',
+    batch: [],
   });
   const [profileSaving, setProfileSaving] = useState(false);
 
@@ -241,6 +242,7 @@ export default function App() {
         designation: data.designation || metadata.designation || '',
         branch: data.branch || data.user_branch || metadata.branch || '',
         phone: data.phone || metadata.phone || '',
+        batch: Array.isArray(data.batch) ? data.batch : data.batch ? [data.batch] : [],
       };
       setStudentProfile(syncedProfile);
       setFormData((current) => ({
@@ -275,6 +277,7 @@ export default function App() {
 
           setActiveBatches(active);
           setAllBatches(master);
+          setSelectedReportBatch(active[0] || 'All');
         }
       } catch (err) {
         console.error('Error fetching exam config:', err);
@@ -310,7 +313,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from('submissions')
-        .select('*, profile:profiles(full_name, employee_id, branch, designation)')
+        .select('*, profile:profiles(full_name, employee_id, branch, designation, batch)')
         .order('id', { ascending: false });
 
       if (error) throw error;
@@ -360,6 +363,11 @@ export default function App() {
       return;
     }
 
+    if (!formData.batch || !activeBatches.includes(formData.batch)) {
+      triggerNotification("দয়া করে একটি সক্রিয় ব্যাচ নির্বাচন করুন।", "error");
+      return;
+    }
+
     const answersProvided = Array.from({ length: 20 }).some((_, i) => formData[`q${i + 1}`]);
     if (!answersProvided) {
       triggerNotification("দয়া করে অন্তত কিছু প্রশ্নের উত্তর নির্বাচন করুন।", "error");
@@ -387,6 +395,7 @@ export default function App() {
         .from("submissions")
         .select("id")
         .eq("profile_id", user.user.id)
+        .eq("batch", formData.batch)
         .maybeSingle();
 
       if (checkError) {
@@ -411,11 +420,24 @@ export default function App() {
         answersPayload[key] = formData[key] || '';
       });
 
+      const profileBatches = Array.from(new Set([
+        ...(Array.isArray(studentProfile.batch) ? studentProfile.batch : studentProfile.batch ? [studentProfile.batch] : []),
+        formData.batch
+      ].filter(Boolean)));
+
+      const { error: profileUpdateError } = await supabase
+        .from('profiles')
+        .update({ batch: profileBatches })
+        .eq('id', user.user.id);
+
+      if (profileUpdateError) throw profileUpdateError;
+      setStudentProfile((current) => ({ ...current, batch: profileBatches }));
+
       const { error: insertError } = await supabase
         .from('submissions')
         .insert([{
           profile_id: user.user.id,
-          batch: formData.batch || '',
+          batch: formData.batch,
           marks: score,
           answers: answersPayload,
           date: new Date().toLocaleDateString('en-GB'),
@@ -553,6 +575,7 @@ export default function App() {
       // UPDATE BOTH LOCAL STATES IMMEDIATELY
       setActiveBatches(activeBatches);
       setAllBatches(allBatches); 
+      setSelectedReportBatch(activeBatches[0] || 'All');
 
       triggerNotification('কনফিগারেশন সফলভাবে আপডেট করা হয়েছে।', 'success');
     } catch (error) {
@@ -596,6 +619,7 @@ export default function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    sessionStorage.removeItem('teacherView');
     setUser(null);
     setGradingSubmission(null);
     setSubmitStatus(null);
@@ -611,6 +635,10 @@ export default function App() {
   const handleStudentProfileSave = async (profile) => {
     setProfileSaving(true);
     try {
+      const profileBatches = Array.from(new Set(
+        (Array.isArray(profile.batch) ? profile.batch : profile.batch ? [profile.batch] : [])
+          .filter((batch) => typeof batch === 'string' && batch.trim() !== '')
+      ));
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -619,13 +647,14 @@ export default function App() {
           designation: profile.designation,
           branch: profile.branch,
           phone: profile.phone,
+          batch: profileBatches,
         })
         .eq('id', user.user.id);
 
       if (error) throw error;
 
       localStorage.setItem('studentProfile', JSON.stringify(profile));
-      setStudentProfile(profile);
+      setStudentProfile({ ...profile, batch: profileBatches });
       setFormData((current) => ({
         ...current,
         userName: profile.name,
@@ -676,7 +705,7 @@ export default function App() {
             />
           ) : (
             <>
-            {showUserManagement ? <AdminUserManagement onNotify={triggerNotification} onBack={() => setShowUserManagement(false)} /> : <>
+            {showUserManagement ? <AdminUserManagement onNotify={triggerNotification} onBack={() => { sessionStorage.removeItem('teacherView'); setShowUserManagement(false); }} /> : <>
             <CourseMaterials canManage onNotify={triggerNotification} />
             <TeacherDashboardComponent 
               submissions={submissions}
@@ -701,7 +730,7 @@ export default function App() {
               onExportExcel={handleExportExcel}
               onGenerateSummaryPDF={generateSummaryPDF}
               onGenerateIndividualPDF={generateIndividualPDF}
-              onManageUsers={() => setShowUserManagement(true)}
+              onManageUsers={() => { sessionStorage.setItem('teacherView', 'users'); setShowUserManagement(true); }}
             />
             {/* Settings Configuration Modal */}
               <ConfigModal
@@ -723,6 +752,7 @@ export default function App() {
             profile={studentProfile}
             onProfileSave={handleStudentProfileSave}
             profileSaving={profileSaving}
+            activeBatches={activeBatches}
             onNotify={triggerNotification}
             examView={
               <StudentTerminalComponent

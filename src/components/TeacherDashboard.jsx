@@ -32,7 +32,7 @@ function TeacherDashboard({
   )
 
   const allAvailableBatches = Array.from(
-    new Set([...(activeBatches || []), ...submissionBatches].filter((b) => b && b.trim() !== ''))
+    new Set([...(activeBatches || []), ...submissionBatches].filter((batch) => batch && batch.trim() !== ''))
   )
 
   const filteredSubmissions = submissions.filter((sub) => {
@@ -162,16 +162,11 @@ function TeacherDashboard({
             onChange={(e) => setSelectedReportBatch(e.target.value)}
           >
             <option value="All">সকল ব্যাচ (Report: All Batches)</option>
-            {activeBatches.map((b, idx) => (
+            {allAvailableBatches.map((b, idx) => (
               <option key={idx} value={b}>
                 {b}
               </option>
             ))}
-            {/* {allAvailableBatches.map((b, i) => (
-              <option key={i} value={b}>
-                {b}
-              </option>
-            ))} */}
           </select>
         </div>
 

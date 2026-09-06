@@ -35,7 +35,7 @@ Deno.serve(async (request) => {
       if (error) return json({ error: error.message }, 400)
 
       const userIds = data.users.map((user) => user.id)
-      const { data: profiles } = await adminClient.from('profiles').select('id, role, full_name, approved').in('id', userIds)
+      const { data: profiles } = await adminClient.from('profiles').select('id, role, full_name, employee_id, branch, designation, approved, batch').in('id', userIds)
       const profileById = new Map((profiles || []).map((profile) => [profile.id, profile]))
       return json({ users: data.users.map((user) => ({
         id: user.id,
@@ -43,7 +43,11 @@ Deno.serve(async (request) => {
         created_at: user.created_at,
         role: profileById.get(user.id)?.role || 'unknown',
         full_name: profileById.get(user.id)?.full_name || user.user_metadata?.full_name || '',
-        approved: profileById.get(user.id)?.approved === true
+        employee_id: profileById.get(user.id)?.employee_id || '',
+        branch: profileById.get(user.id)?.branch || '',
+        designation: profileById.get(user.id)?.designation || '',
+        approved: profileById.get(user.id)?.approved === true,
+        batch: profileById.get(user.id)?.batch || []
       })) })
     }
 
@@ -62,6 +66,30 @@ Deno.serve(async (request) => {
       }
       const { error } = await adminClient.from('profiles').update({ approved: true }).in('id', payload.userIds)
       if (error) return json({ error: error.message }, 400)
+      return json({ success: true })
+    }
+
+    if (payload.action === 'assign-batch') {
+      if (!Array.isArray(payload.userIds) || payload.userIds.length === 0 || payload.userIds.some((id) => typeof id !== 'string') || typeof payload.batch !== 'string' || !payload.batch.trim()) {
+        return json({ error: 'At least one valid user ID and a batch name are required.' }, 400)
+      }
+      const batch = payload.batch.trim()
+      const { data: profiles, error: profileError } = await adminClient
+        .from('profiles')
+        .select('id, batch')
+        .in('id', payload.userIds)
+      if (profileError) return json({ error: profileError.message }, 400)
+
+      for (const profile of profiles || []) {
+        const currentBatches = Array.isArray(profile.batch) ? profile.batch : profile.batch ? [profile.batch] : []
+        if (!currentBatches.includes(batch)) {
+          const { error } = await adminClient
+            .from('profiles')
+            .update({ batch: [...currentBatches, batch] })
+            .eq('id', profile.id)
+          if (error) return json({ error: error.message }, 400)
+        }
+      }
       return json({ success: true })
     }
 
