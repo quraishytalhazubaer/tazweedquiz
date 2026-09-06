@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 
-function AdminUserManagement({ onNotify, onBack }) {
+function AdminUserManagement({ onNotify, onBack, activeBatches = [] }) {
   const [users, setUsers] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [passwords, setPasswords] = useState({});
@@ -534,20 +534,20 @@ function AdminUserManagement({ onNotify, onBack }) {
             aria-label="Filter by created date"
           />
           <div className="flex flex-1 gap-2">
-            <input
-              list="available-batches"
+            <select
               value={batchToAssign}
               onChange={(event) => setBatchToAssign(event.target.value)}
-              placeholder="Batch name"
               className="min-w-0 flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
-            />
-            <datalist id="available-batches">
-              {batchStats.map(({ batch }) => <option key={batch} value={batch} />)}
-            </datalist>
-            <button type="button" onClick={assignBatch} disabled={working || !selectedIds.length} className="px-3 py-2.5 bg-sky-700 text-white rounded-xl text-xs font-bold whitespace-nowrap disabled:opacity-50">
+              aria-label="Select active batch to assign"
+            >
+              <option value="">Select active batch</option>
+              {activeBatches.map((batch) => <option key={batch} value={batch}>{batch}</option>)}
+            </select>
+            <button type="button" onClick={assignBatch} disabled={working || !selectedIds.length || !batchToAssign} className="px-3 py-2.5 bg-sky-700 text-white rounded-xl text-xs font-bold whitespace-nowrap disabled:opacity-50">
               Assign batch
             </button>
           </div>
+          {!activeBatches.length && <p className="text-xs text-amber-700">No active batches are configured. Add one in Exam Dashboard settings first.</p>}
           <label className="flex items-center gap-2 px-3 text-sm font-bold text-slate-700">
             <input
               type="checkbox"

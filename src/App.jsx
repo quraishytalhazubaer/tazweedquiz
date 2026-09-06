@@ -867,6 +867,7 @@ export default function App() {
               <AdminUserManagement
                 onNotify={triggerNotification}
                 onBack={() => handleTeacherPageChange('exam')}
+                activeBatches={activeBatches}
               />
             )}
             {teacherPage === 'exam' && <>
