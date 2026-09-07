@@ -10,11 +10,6 @@ const navigation = [
   { id: 'profile', label: 'প্রোফাইল এডিট', icon: Pencil },
 ]
 
-const getLocalDateKey = () => {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
-
 function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit }) {
   const [activeView, setActiveView] = useState('materials')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -81,14 +76,14 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
           <section className="bg-white rounded-3xl border border-slate-200/70 shadow-sm p-8 text-center animate-slide-in">
             <QrCode className="h-12 w-12 mx-auto text-emerald-700 mb-4" />
             <h2 className="text-2xl font-black text-slate-950">হাজিরা প্রদান</h2>
-            {attendance.isActive && attendance.date === getLocalDateKey() ? (
+            {attendance.isActive && attendance.date ? (
               <form onSubmit={submitAttendance} className="max-w-sm mx-auto mt-6 space-y-4">
-                <p className="text-sm text-slate-500">শিক্ষকের কাছ থেকে আজকের কোড নিয়ে নিচে লিখুন।</p>
+                <p className="text-sm text-slate-500">তারিখ {attendance.date}-এর জন্য শিক্ষকের কাছ থেকে কোড নিয়ে নিচে লিখুন।</p>
                 <div className="relative"><KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" /><input required value={attendanceCode} onChange={(event) => setAttendanceCode(event.target.value.toUpperCase())} placeholder="20260906-1030-A7K2" className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
                 <button disabled={attendanceSaving} className="w-full py-3 rounded-2xl bg-emerald-700 text-white font-bold disabled:opacity-60">{attendanceSaving ? 'জমা হচ্ছে...' : 'আজকের হাজিরা দিন'}</button>
               </form>
             ) : (
-              <div className="mt-6 text-slate-500"><CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-slate-300" /><p className="text-sm">আজকের হাজিরা সেশন এখনো চালু হয়নি।</p></div>
+              <div className="mt-6 text-slate-500"><CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-slate-300" /><p className="text-sm">হাজিরা সেশন এখনো চালু হয়নি।</p></div>
             )}
             <div className="mt-8 pt-6 border-t border-slate-100 text-left">
               <div className="flex items-center gap-2 mb-3">
