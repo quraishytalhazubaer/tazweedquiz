@@ -1,4 +1,4 @@
-import { BookOpen, CheckCircle2, ClipboardCheck, KeyRound, Menu, Pencil, QrCode, UserRound, X } from 'lucide-react'
+import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, KeyRound, Menu, Pencil, QrCode, UserRound, X } from 'lucide-react'
 import { useState } from 'react'
 import CourseMaterials from './CourseMaterials'
 import ProfileEdit from './ProfileEdit'
@@ -15,7 +15,7 @@ const getLocalDateKey = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
-function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, onAttendanceSubmit }) {
+function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit }) {
   const [activeView, setActiveView] = useState('materials')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [attendanceCode, setAttendanceCode] = useState('')
@@ -90,6 +90,36 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
             ) : (
               <div className="mt-6 text-slate-500"><CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-slate-300" /><p className="text-sm">আজকের হাজিরা সেশন এখনো চালু হয়নি।</p></div>
             )}
+            <div className="mt-8 pt-6 border-t border-slate-100 text-left">
+              <div className="flex items-center gap-2 mb-3">
+                <CalendarClock className="h-5 w-5 text-emerald-700" />
+                <div>
+                  <h3 className="font-black text-slate-900">আমার হাজিরার রেকর্ড</h3>
+                  <p className="text-xs text-slate-500">আপনার দেওয়া হাজিরার তারিখ ও সময়</p>
+                </div>
+              </div>
+              {attendanceRecords.length ? (
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                      <tr><th className="px-4 py-3 text-left">SL</th><th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">Time</th><th className="px-4 py-3 text-left">Status</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {attendanceRecords.map((record, index) => (
+                        <tr key={record.id}>
+                          <td className="px-4 py-3 text-slate-500">{index + 1}</td>
+                          <td className="px-4 py-3 font-semibold text-slate-800">{record.attendance_date}</td>
+                          <td className="px-4 py-3 text-slate-600">{record.marked_at ? new Date(record.marked_at).toLocaleTimeString() : '---'}</td>
+                          <td className="px-4 py-3 font-bold text-emerald-700">Present</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-500">আপনার কোনো হাজিরার রেকর্ড নেই।</p>
+              )}
+            </div>
           </section>
         )}
       </main>

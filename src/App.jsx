@@ -58,6 +58,27 @@ const getLocalDateKey = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+const getLastFiveWorkingDays = (date = new Date()) => {
+  const days = [];
+  const cursor = new Date(date);
+  while (days.length < 5) {
+    if (cursor.getDay() !== 5 && cursor.getDay() !== 6) days.unshift(getLocalDateKey(cursor));
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return days;
+};
+
+const getWorkingDaysInRange = (fromDate, toDate) => {
+  const days = [];
+  const cursor = new Date(`${toDate}T00:00:00`);
+  const firstDate = new Date(`${fromDate}T00:00:00`);
+  while (cursor >= firstDate) {
+    if (cursor.getDay() !== 5 && cursor.getDay() !== 6) days.unshift(getLocalDateKey(cursor));
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return days;
+};
+
 const generateAttendanceCode = () => {
   const now = new Date();
   const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
@@ -116,6 +137,9 @@ export default function App() {
   // Teacher dashboard state
   const [submissions, setSubmissions] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [studentAttendanceRecords, setStudentAttendanceRecords] = useState([]);
+  const [attendanceReport, setAttendanceReport] = useState([]);
+  const [attendanceSummary, setAttendanceSummary] = useState({ total: 0, present: 0, absent: 0 });
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
@@ -139,6 +163,23 @@ export default function App() {
     setTimeout(() => {
       setNotification(null);
     }, 4500);
+  };
+
+  const fetchStudentAttendance = async (profileId) => {
+    if (!profileId) return;
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('id, attendance_date, marked_at')
+      .eq('profile_id', profileId)
+      .order('attendance_date', { ascending: false })
+      .order('marked_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to fetch student attendance:', error);
+      triggerNotification('আপনার হাজিরার তথ্য লোড করা যায়নি।', 'error');
+      return;
+    }
+    setStudentAttendanceRecords(data || []);
   };
 
   useEffect(() => {
@@ -287,6 +328,10 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
+    if (user?.role === 'student') fetchStudentAttendance(user.user.id);
+  }, [user]);
+
+  useEffect(() => {
     const fetchExamConfig = async () => {
       try {
         const { data, error } = await supabase
@@ -380,24 +425,77 @@ export default function App() {
     }
   };
 
-  const fetchAttendanceRecords = async () => {
+  const fetchAttendanceRecords = async (filters = {}) => {
     setLoadingAttendance(true);
     try {
-      const { data, error } = await supabase
-        .from('attendance_records')
-        .select('id, profile_id, attendance_date, attendance_code, marked_at, profile:profiles(full_name, employee_id, branch)')
-        .eq('attendance_date', getLocalDateKey())
-        .order('marked_at', { ascending: false });
+      const defaultWorkingDays = getLastFiveWorkingDays();
+      const workingDays = filters.workingDays || (
+        filters.fromDate && filters.toDate
+          ? getWorkingDaysInRange(filters.fromDate, filters.toDate)
+          : defaultWorkingDays
+      );
+      const fromDate = filters.fromDate || workingDays[0];
+      const toDate = filters.toDate || workingDays[workingDays.length - 1];
+      const today = getLocalDateKey();
+      const selectedBatch = filters.batch || activeBatches[0] || 'All';
+      const [{ data, error }, { data: students, error: studentsError }, { data: todayRecords, error: todayError }] = await Promise.all([
+        supabase
+          .from('attendance_records')
+          .select('id, profile_id, attendance_date, attendance_code, marked_at, profile:profiles(full_name, employee_id, branch, batch)')
+          .gte('attendance_date', fromDate)
+          .lte('attendance_date', toDate)
+          .order('marked_at', { ascending: false }),
+        supabase
+          .from('profiles')
+          .select('id, full_name, employee_id, branch, batch')
+          .eq('role', 'student')
+          .eq('approved', true),
+        supabase
+          .from('attendance_records')
+          .select('profile_id')
+          .eq('attendance_date', today),
+      ]);
 
-      if (error) throw error;
+      if (error || studentsError || todayError) throw error || studentsError || todayError;
 
-      setAttendanceRecords((data || []).map((record) => ({
+      const records = (data || []).map((record) => ({
         id: record.id,
         name: record.profile?.full_name || '---',
         employeeId: record.profile?.employee_id || '',
         branch: record.profile?.branch || '',
+        batch: Array.isArray(record.profile?.batch) ? record.profile.batch.join(', ') : record.profile?.batch || '',
+        attendanceDate: record.attendance_date,
         markedAt: record.marked_at,
-      })));
+      }));
+      setAttendanceRecords(filters.batch && filters.batch !== 'All'
+        ? records.filter((record) => record.batch.split(', ').includes(filters.batch))
+        : records);
+
+      const matchesBatch = (profile) => selectedBatch === 'All' ||
+        (Array.isArray(profile.batch) ? profile.batch : [profile.batch]).includes(selectedBatch);
+      const batchStudents = (students || []).filter(matchesBatch);
+      const presentIds = new Set((todayRecords || []).map((record) => record.profile_id));
+      const present = batchStudents.filter((student) => presentIds.has(student.id)).length;
+      setAttendanceSummary({ total: batchStudents.length, present, absent: batchStudents.length - present });
+
+      const attendanceByStudentAndDate = new Set((data || []).map((record) => `${record.profile_id}:${record.attendance_date}`));
+      setAttendanceReport(batchStudents.map((student) => {
+        const days = workingDays.map((date) => ({
+          date,
+          present: attendanceByStudentAndDate.has(`${student.id}:${date}`),
+        }));
+        const presentDays = days.filter((day) => day.present).length;
+        return {
+          id: student.id,
+          name: student.full_name || '---',
+          employeeId: student.employee_id || '',
+          branch: student.branch || '',
+          batch: Array.isArray(student.batch) ? student.batch.join(', ') : student.batch || '',
+          days,
+          presentDays,
+          absentDays: days.length - presentDays,
+        };
+      }));
     } catch (err) {
       console.error('Failed to fetch attendance records:', err);
       triggerNotification('হাজিরার তালিকা লোড করা যায়নি।', 'error');
@@ -609,6 +707,7 @@ export default function App() {
       throw error;
     }
 
+    await fetchStudentAttendance(user.user.id);
     triggerNotification('আজকের হাজিরা সফলভাবে দেওয়া হয়েছে।', 'success');
   };
 
@@ -856,11 +955,14 @@ export default function App() {
               <AttendancePanel
                 attendance={attendance}
                 attendanceRecords={attendanceRecords}
+                attendanceReport={attendanceReport}
+                attendanceSummary={attendanceSummary}
                 attendanceLoading={loadingAttendance}
                 onToggleAttendance={handleToggleAttendance}
                 onRegenerateAttendance={handleRegenerateAttendance}
                 onRefreshAttendance={fetchAttendanceRecords}
                 onNotify={triggerNotification}
+                activeBatches={activeBatches}
               />
             )}
             {teacherPage === 'users' && (
@@ -919,6 +1021,7 @@ export default function App() {
             activeBatches={activeBatches}
             onNotify={triggerNotification}
             attendance={attendance}
+            attendanceRecords={studentAttendanceRecords}
             onAttendanceSubmit={handleStudentAttendance}
             examView={
               <StudentTerminalComponent
