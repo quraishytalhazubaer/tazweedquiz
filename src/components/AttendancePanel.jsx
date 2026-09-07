@@ -1,6 +1,13 @@
 import { CalendarClock, Copy, KeyRound, Loader2, Power, Printer, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 
+const getLocalDateKey = (date = new Date()) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function AttendancePanel({
   attendance = {},
   attendanceReport = [],
@@ -30,6 +37,7 @@ function AttendancePanel({
   const [toDate, setToDate] = useState(initialWorkingDays[initialWorkingDays.length - 1])
   const workingDays = getWorkingDays(fromDate, toDate)
   const [selectedBatch, setSelectedBatch] = useState('All')
+  const [codeDate, setCodeDate] = useState(getLocalDateKey)
 
   const loadReport = () => {
     if (fromDate > toDate) {
@@ -155,10 +163,20 @@ function AttendancePanel({
           >
             <Copy className="h-4 w-4" /> Copy
           </button>
+          <label className="text-xs font-bold text-slate-500">
+            Code date
+            <input
+              type="date"
+              value={codeDate}
+              onChange={(event) => setCodeDate(event.target.value)}
+              className="block mt-1 px-2 py-2 rounded-xl border border-amber-200 text-xs text-slate-700"
+            />
+          </label>
           <button
             type="button"
-            onClick={onRegenerateAttendance}
-            className="px-4 py-2.5 rounded-xl bg-amber-100 text-amber-900 font-bold text-xs flex items-center gap-2"
+            onClick={() => onRegenerateAttendance?.(codeDate)}
+            disabled={!codeDate}
+            className="px-4 py-2.5 rounded-xl bg-amber-100 text-amber-900 font-bold text-xs flex items-center gap-2 disabled:opacity-50"
           >
             <RefreshCw className="h-4 w-4" /> নতুন কোড
           </button>

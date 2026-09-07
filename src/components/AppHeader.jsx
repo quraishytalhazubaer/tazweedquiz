@@ -12,7 +12,7 @@ function AppHeader({ user, onLogout }) {
               <ClipboardCheck className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-lg font-black text-slate-900 leading-tight tracking-tight">IBTRA Evaluation Portal</h1>
+              <h1 className="text-lg font-black text-slate-900 leading-tight tracking-tight">Al Qur'an & Tazweed Evaluation Portal</h1>
               <p className="text-[11px] text-[#1B4D1A] font-bold">Islami Bank Training and Research Academy</p>
             </div>
           </div>

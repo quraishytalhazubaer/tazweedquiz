@@ -79,11 +79,11 @@ const getWorkingDaysInRange = (fromDate, toDate) => {
   return days;
 };
 
-const generateAttendanceCode = () => {
+const generateAttendanceCode = (attendanceDate = getLocalDateKey()) => {
   const now = new Date();
   const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
   const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `${getLocalDateKey(now).replaceAll('-', '')}-${time}-${random}`;
+  return `${attendanceDate.replaceAll('-', '')}-${time}-${random}`;
 };
 
 // ============================================================================
@@ -671,12 +671,12 @@ export default function App() {
     newStatus ? 'আজকের হাজিরা চালু করা হয়েছে।' : 'আজকের হাজিরা বন্ধ করা হয়েছে।'
   );
 
-  const handleRegenerateAttendance = () => {
+  const handleRegenerateAttendance = (attendanceDate = getLocalDateKey()) => {
     const now = new Date();
     return handleAttendanceUpdate(
       {
-        attendance_code: generateAttendanceCode(),
-        attendance_date: getLocalDateKey(now),
+        attendance_code: generateAttendanceCode(attendanceDate),
+        attendance_date: attendanceDate,
         attendance_generated_at: now.toISOString(),
         attendance_is_active: true,
       },
@@ -692,8 +692,8 @@ export default function App() {
       .single();
 
     if (configError) throw configError;
-    if (!config.attendance_is_active || config.attendance_date !== getLocalDateKey() || config.attendance_code !== code.trim().toUpperCase()) {
-      throw new Error('আজকের হাজিরা কোডটি সঠিক নয় অথবা হাজিরা বন্ধ রয়েছে।');
+    if (!config.attendance_is_active || !config.attendance_date || config.attendance_code !== code.trim().toUpperCase()) {
+      throw new Error('হাজিরা কোডটি সঠিক নয় অথবা হাজিরা বন্ধ রয়েছে।');
     }
 
     const { error } = await supabase.from('attendance_records').insert({
