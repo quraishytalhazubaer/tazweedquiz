@@ -595,12 +595,16 @@ export default function App() {
       const { error: insertError } = await supabase
         .from('submissions')
         .insert([{
+          user_name: formData.userName,
+          user_id: formData.userId,
+          user_branch: formData.userBranch,
+          designation: formData.designation,
           profile_id: user.user.id,
           batch: formData.batch,
           marks: score,
           answers: answersPayload,
-          date: new Date().toLocaleDateString('en-GB'),
-          timestamp: new Date().toLocaleTimeString()
+          date: getLocalDateKey(),
+          timestamp: new Date().toISOString()
         }]);
 
       if (insertError) throw insertError;
@@ -609,7 +613,13 @@ export default function App() {
       localStorage.removeItem("examAnswers");
       triggerNotification("আপনার উত্তরপত্র সফলভাবে গৃহীত হয়েছে।", "success");
     } catch (err) {
-      console.error("Submission failed:", err);
+      console.error("Submission failed:", {
+        message: err?.message,
+        code: err?.code,
+        details: err?.details,
+        hint: err?.hint,
+        error: err
+      });
         if (err.code === "23505") {
           triggerNotification(
             "এই আইডি থেকে ইতোমধ্যে একটি উত্তরপত্র জমা দেওয়া হয়েছে।",
