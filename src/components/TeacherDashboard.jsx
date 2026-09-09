@@ -58,6 +58,21 @@ function TeacherDashboard({
         : subBatch === selectedReportBatch
 
     return matchSearch && matchBranch && matchBatch
+  }).sort((first, second) => {
+    const firstId = String(first.userId || '').trim()
+    const secondId = String(second.userId || '').trim()
+
+    if (!firstId && !secondId) return 0
+    if (!firstId) return 1
+    if (!secondId) return -1
+
+    const firstNumber = Number(firstId)
+    const secondNumber = Number(secondId)
+    if (Number.isFinite(firstNumber) && Number.isFinite(secondNumber)) {
+      return firstNumber - secondNumber
+    }
+
+    return firstId.localeCompare(secondId, undefined, { numeric: true, sensitivity: 'base' })
   })
 
   const toggleSelectAll = () => {

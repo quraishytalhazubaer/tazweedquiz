@@ -5,6 +5,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
   const [overrideMarks, setOverrideMarks] = useState('')
   const [isIdentityEditing, setIsIdentityEditing] = useState(false)
   const [identityDraft, setIdentityDraft] = useState(() => ({
+    userId: submission?.userId ,
     userName: submission?.userName ,
     userBranch: submission?.userBranch ,
     designation: submission?.designation,
@@ -16,6 +17,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
     }
     if (submission) {
       setIdentityDraft({
+        userId: submission.userId || '',
         userName: submission.userName || '',
         userBranch: submission.userBranch || '',
         designation: submission.designation || '',
@@ -30,6 +32,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
 
   const cancelIdentityEditing = () => {
     setIdentityDraft({
+      userId: submission.userId || '',
       userName: submission.userName || '',
       userBranch: submission.userBranch || '',
       designation: submission.designation || '',
@@ -106,7 +109,16 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
           </div>
           <div>
             <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">স্টুডেন্ট আইডি (রোল)</span>
+            {isIdentityEditing ? (
+              <input
+                type="text"
+                value={identityDraft.userId}
+                onChange={(e) => updateIdentityDraft('userId', e.target.value)}
+                className="w-full mt-1 px-2 py-1 text-sm font-bold text-base rounded-lg"
+              />
+            ) : (
             <p className="text-base font-semibold mt-0.5 font-mono">{submission.userId || 'Not Provided'}</p>
+            )}
           </div>
           <div>
             <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">শাখা / শাখা কার্যালয়</span>

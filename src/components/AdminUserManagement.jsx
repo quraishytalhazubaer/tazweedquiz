@@ -29,6 +29,7 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [] }) {
   const [batchToAssign, setBatchToAssign] = useState("");
   const [expandedBatches, setExpandedBatches] = useState({});
   const [selectedUser, setSelectedUser] = useState(null);
+  const [employeeIdDraft, setEmployeeIdDraft] = useState("");
 
   const loadUsers = async () => {
     setLoading(true);
@@ -51,6 +52,31 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [] }) {
   useEffect(() => {
     loadUsers();
   }, []);
+
+  const openUser = (user) => {
+    setSelectedUser(user);
+    setEmployeeIdDraft(user.employee_id || "");
+  };
+
+  const changeEmployeeId = async () => {
+    const employeeId = employeeIdDraft.trim();
+    if (!employeeId) return onNotify("একটি student ID লিখুন।", "error");
+    setWorking(true);
+    const { data, error } = await supabase.functions.invoke(
+      "admin-user-management",
+      { body: { action: "update-employee-id", userId: selectedUser.id, employeeId } },
+    );
+    if (error || data?.error) {
+      onNotify(`Student ID পরিবর্তন করা যায়নি: ${error?.message || data.error}`, "error");
+    } else {
+      setUsers((current) => current.map((user) =>
+        user.id === selectedUser.id ? { ...user, employee_id: employeeId } : user,
+      ));
+      setSelectedUser((current) => ({ ...current, employee_id: employeeId }));
+      onNotify("Student ID সফলভাবে পরিবর্তন করা হয়েছে।", "success");
+    }
+    setWorking(false);
+  };
 
   const toggleIds = (ids) =>
     setSelectedIds((current) => {
@@ -152,9 +178,9 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [] }) {
       key={user.id}
       role="button"
       tabIndex={0}
-      onClick={() => setSelectedUser(user)}
+      onClick={() => openUser(user)}
       onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") setSelectedUser(user);
+        if (event.key === "Enter" || event.key === " ") openUser(user);
       }}
       className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white border border-slate-200 rounded-2xl shadow-sm cursor-pointer hover:border-emerald-300 hover:shadow-md transition"
     >
@@ -600,7 +626,26 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [] }) {
               </button>
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Employee ID</p><p className="mt-1 text-sm font-black text-slate-800">{selectedUser.employee_id || "—"}</p></div>
+              <div className="rounded-2xl bg-slate-50 p-3">
+                <label htmlFor="student-id" className="text-xs font-bold uppercase tracking-wide text-slate-400">Student ID</label>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    id="student-id"
+                    value={employeeIdDraft}
+                    onChange={(event) => setEmployeeIdDraft(event.target.value)}
+                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800"
+                    placeholder="Student ID"
+                  />
+                  <button
+                    type="button"
+                    onClick={changeEmployeeId}
+                    disabled={working}
+                    className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
               <div className={`rounded-2xl p-3 ${selectedUser.approved ? "bg-emerald-50" : "bg-amber-50"}`}><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Status</p><p className="mt-1 text-sm font-black text-slate-800">{selectedUser.approved ? "Approved" : "Pending"}</p></div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3">

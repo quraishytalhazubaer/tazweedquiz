@@ -60,6 +60,19 @@ Deno.serve(async (request) => {
       return json({ success: true })
     }
 
+    if (payload.action === 'update-employee-id') {
+      if (typeof payload.userId !== 'string' || typeof payload.employeeId !== 'string' || !payload.employeeId.trim()) {
+        return json({ error: 'A valid user ID and student ID are required.' }, 400)
+      }
+      const employeeId = payload.employeeId.trim()
+      const { error } = await adminClient
+        .from('profiles')
+        .update({ employee_id: employeeId })
+        .eq('id', payload.userId)
+      if (error) return json({ error: error.message }, 400)
+      return json({ success: true, employeeId })
+    }
+
     if (payload.action === 'approve-users') {
       if (!Array.isArray(payload.userIds) || payload.userIds.length === 0 || payload.userIds.some((id) => typeof id !== 'string')) {
         return json({ error: 'At least one valid user ID is required.' }, 400)

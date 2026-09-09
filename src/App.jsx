@@ -727,15 +727,40 @@ export default function App() {
     }
   }, [user]);
 
-  const handleUpdateMarks = async (submissionId, newMarks) => {
+  const handleUpdateMarks = async (submissionId, newMarks, identityDraft) => {
     setSavingMarks(true);
     const parsedMarks = parseFloat(newMarks);
+    const studentId = identityDraft?.userId?.trim();
+    const targetSubmission = submissions.find((submission) => submission.id === submissionId);
 
     try {
+      if (!studentId) throw new Error('Student ID is required.');
+
+      if (targetSubmission?.profileId) {
+        const { data: profileData, error: profileError } = await supabase.functions.invoke(
+          'admin-user-management',
+          {
+            body: {
+              action: 'update-employee-id',
+              userId: targetSubmission.profileId,
+              employeeId: studentId,
+            },
+          },
+        );
+
+        if (profileError || profileData?.error) {
+          throw new Error(profileError?.message || profileData.error);
+        }
+      }
+
       const { error } = await supabase
         .from('submissions')
         .update({
           marks: parsedMarks,
+          user_id: studentId,
+          user_name: identityDraft.userName,
+          user_branch: identityDraft.userBranch,
+          designation: identityDraft.designation,
         })
         .eq('id', submissionId);
 
@@ -744,6 +769,10 @@ export default function App() {
       setSubmissions(prev => prev.map(s => s.id === submissionId ? {
         ...s,
         marks: parsedMarks,
+        userId: studentId,
+        userName: identityDraft.userName,
+        userBranch: identityDraft.userBranch,
+        designation: identityDraft.designation,
       } : s));
       setGradingSubmission(null);
       triggerNotification("শিক্ষার্থীর প্রাপ্ত নম্বর সফলভাবে সেভ করা হয়েছে।", "success");
