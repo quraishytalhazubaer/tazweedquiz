@@ -1,8 +1,43 @@
 import { useEffect, useState } from 'react'
-import { BookOpen, CheckCircle2, Clock3, FileAudio, FileText, Pencil, PlayCircle, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Clock3, FileText, Pencil, PlayCircle, Plus, Trash2, X } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 const emptyMaterial = { category: '', type: '', title: '', subtitle: '', description: '', duration: '', action: '' }
+const categories = ['Quran', 'Tazweed', 'Riba', 'Salah']
+const categoryDetails = {
+  Quran: {
+    icon: BookOpen,
+    eyebrow: 'Recitation & reflection',
+    description: 'Build a stronger connection with the Quran through guided study materials.',
+    iconClass: 'bg-emerald-100 text-emerald-800 group-hover:bg-emerald-700 group-hover:text-white',
+    borderClass: 'hover:border-emerald-300',
+    countClass: 'text-emerald-700',
+  },
+  Tazweed: {
+    icon: PlayCircle,
+    eyebrow: 'Rules of recitation',
+    description: 'Practice pronunciation, rhythm, and the essential rules of Tazweed.',
+    iconClass: 'bg-sky-100 text-sky-800 group-hover:bg-sky-700 group-hover:text-white',
+    borderClass: 'hover:border-sky-300',
+    countClass: 'text-sky-700',
+  },
+  Riba: {
+    icon: FileText,
+    eyebrow: 'Learning & guidance',
+    description: 'Explore clear lessons and references about Riba and responsible conduct.',
+    iconClass: 'bg-amber-100 text-amber-800 group-hover:bg-amber-600 group-hover:text-white',
+    borderClass: 'hover:border-amber-300',
+    countClass: 'text-amber-700',
+  },
+  Salah: {
+    icon: CheckCircle2,
+    eyebrow: 'Practice & routine',
+    description: 'Review the guidance and practical resources that support daily Salah.',
+    iconClass: 'bg-rose-100 text-rose-800 group-hover:bg-rose-700 group-hover:text-white',
+    borderClass: 'hover:border-rose-300',
+    countClass: 'text-rose-700',
+  },
+}
 const iconByType = { DOCUMENT: FileText, 'AUDIO LESSON': PlayCircle, MANUAL: BookOpen }
 
 const getMaterialUrl = (value) => {
@@ -18,6 +53,7 @@ function CourseMaterials({ onNotify, canManage = false }) {
   const [materials, setMaterials] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingMaterial, setEditingMaterial] = useState(null)
+  const [selectedCategory, setSelectedCategory] = useState('')
 
   const fetchMaterials = async () => {
     setLoading(true)
@@ -28,6 +64,10 @@ function CourseMaterials({ onNotify, canManage = false }) {
   }
 
   useEffect(() => { fetchMaterials() }, [])
+
+  const visibleMaterials = materials.filter((material) => (
+    material.category || '').trim().toLowerCase() === selectedCategory.toLowerCase()
+  )
 
   const saveMaterial = async (event) => {
     event.preventDefault()
@@ -63,9 +103,64 @@ function CourseMaterials({ onNotify, canManage = false }) {
         </div>
       </div>
 
-      <div>
+      {!selectedCategory ? (
+        <div className="space-y-5">
+          <div className="flex items-end justify-between gap-4 px-1">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-slate-400">Browse by subject</p>
+            </div>
+            <span className="hidden sm:block text-xs font-bold text-slate-400">{categories.length} subjects available</span>
+          </div>
+          <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+          {categories.map((category) => {
+            const count = materials.filter((material) => (
+              material.category || '').trim().toLowerCase() === category.toLowerCase()
+            ).length
+            const details = categoryDetails[category]
+            const Icon = details.icon
+            return (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setSelectedCategory(category)}
+                className={`group min-h-52 text-left bg-white rounded-3xl p-5 border border-slate-200/70 shadow-sm ${details.borderClass} hover:-translate-y-1 hover:shadow-xl transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/10`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${details.iconClass}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-slate-300 group-hover:translate-x-1 group-hover:text-slate-700 transition-all" />
+                </div>
+                <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">{details.eyebrow}</p>
+                <h3 className="mt-1 text-xl font-black text-slate-950">{category}</h3>
+                <p className="mt-2 min-h-10 text-sm leading-relaxed text-slate-500">{details.description}</p>
+                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                  <span className={`text-xs font-black ${details.countClass}`}>{count}টি মেটেরিয়াল</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Open subject</span>
+                </div>
+              </button>
+            )
+          })}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('')}
+                className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-emerald-700 hover:border-emerald-200"
+                title="ক্যাটাগরিতে ফিরুন"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <h3 className="text-xl font-black text-slate-950">{selectedCategory}</h3>
+            </div>
+            <span className="text-sm font-bold text-slate-500">{visibleMaterials.length}টি মেটেরিয়াল</span>
+          </div>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 mt-4">
-          {loading ? <p className="text-sm text-slate-500">মেটেরিয়াল লোড হচ্ছে...</p> : materials.map((material) => {
+          {loading ? <p className="text-sm text-slate-500">মেটেরিয়াল লোড হচ্ছে...</p> : visibleMaterials.length ? visibleMaterials.map((material) => {
             const Icon = iconByType[material.type] || BookOpen
             return (
               <article key={material.id} className="bg-white rounded-3xl p-6 border border-slate-200/70 shadow-sm hover:shadow-md transition-shadow">
@@ -90,10 +185,11 @@ function CourseMaterials({ onNotify, canManage = false }) {
                 </div>
               </article>
             )
-          })}
+          }) : <p className="text-sm text-slate-500">এই ক্যাটাগরিতে কোনো মেটেরিয়াল নেই।</p>}
         </div>
       </div>
-      {canManage && editingMaterial && <div className="fixed inset-0 z-40 bg-slate-950/40 flex items-center justify-center p-4"><form onSubmit={saveMaterial} className="w-full max-w-2xl bg-white rounded-3xl p-6 space-y-4"><div className="flex justify-between items-center"><h3 className="text-xl font-black">মেটেরিয়াল {editingMaterial.id ? 'এডিট' : 'যুক্ত করুন'}</h3><button type="button" onClick={() => setEditingMaterial(null)}><X /></button></div><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{Object.keys(emptyMaterial).map((field) => <input key={field} type={field === 'action' ? 'url' : 'text'} required={['title', 'description'].includes(field)} value={editingMaterial[field] || ''} onChange={(event) => setEditingMaterial((current) => ({ ...current, [field]: event.target.value }))} placeholder={field === 'action' ? 'https://example.com' : field} className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" />)}</div><button type="submit" className="flex items-center gap-2 px-5 py-3 bg-emerald-700 text-white rounded-xl text-sm font-bold"><CheckCircle2 className="h-4 w-4" /> সংরক্ষণ করুন</button></form></div>}
+      )}
+      {canManage && editingMaterial && <div className="fixed inset-0 z-40 bg-slate-950/40 flex items-center justify-center p-4"><form onSubmit={saveMaterial} className="w-full max-w-2xl bg-white rounded-3xl p-6 space-y-4"><div className="flex justify-between items-center"><h3 className="text-xl font-black">মেটেরিয়াল {editingMaterial.id ? 'এডিট' : 'যুক্ত করুন'}</h3><button type="button" onClick={() => setEditingMaterial(null)}><X /></button></div><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{Object.keys(emptyMaterial).map((field) => field === 'category' ? <select key={field} required value={editingMaterial[field] || ''} onChange={(event) => setEditingMaterial((current) => ({ ...current, [field]: event.target.value }))} className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"><option value="">ক্যাটাগরি নির্বাচন করুন</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select> : <input key={field} type={field === 'action' ? 'url' : 'text'} required={['title', 'description'].includes(field)} value={editingMaterial[field] || ''} onChange={(event) => setEditingMaterial((current) => ({ ...current, [field]: event.target.value }))} placeholder={field === 'action' ? 'https://example.com' : field} className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" />)}</div><button type="submit" className="flex items-center gap-2 px-5 py-3 bg-emerald-700 text-white rounded-xl text-sm font-bold"><CheckCircle2 className="h-4 w-4" /> সংরক্ষণ করুন</button></form></div>}
     </section>
   )
 }
