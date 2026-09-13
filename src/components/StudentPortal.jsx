@@ -1,5 +1,6 @@
-import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, KeyRound, Menu, Pencil, QrCode, UserRound, X } from 'lucide-react'
-import { useState } from 'react'
+import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, KeyRound, Menu, Pencil, QrCode, ScanLine, UserRound, X } from 'lucide-react'
+import { Html5Qrcode } from 'html5-qrcode'
+import { useEffect, useState } from 'react'
 import CourseMaterials from './CourseMaterials'
 import ProfileEdit from './ProfileEdit'
 
@@ -13,8 +14,47 @@ const navigation = [
 function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit }) {
   const [activeView, setActiveView] = useState('materials')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
-  const [attendanceCode, setAttendanceCode] = useState('')
+  const [attendanceCode, setAttendanceCode] = useState(() => (
+    new URLSearchParams(window.location.search).get('attendance')?.toUpperCase() || ''
+  ))
   const [attendanceSaving, setAttendanceSaving] = useState(false)
+  const [isScannerOpen, setIsScannerOpen] = useState(false)
+  const [scannerError, setScannerError] = useState('')
+
+  useEffect(() => {
+    if (!isScannerOpen) return undefined
+
+    const scanner = new Html5Qrcode('attendance-qr-reader')
+    let isMounted = true
+    const handleScan = (decodedText) => {
+      try {
+        const scannedUrl = new URL(decodedText)
+        const scannedCode = scannedUrl.searchParams.get('attendance')
+        setAttendanceCode((scannedCode || decodedText).toUpperCase())
+      } catch {
+        setAttendanceCode(decodedText.toUpperCase())
+      }
+      setIsScannerOpen(false)
+    }
+
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 240, height: 240 } },
+      handleScan,
+      () => {},
+    ).catch(() => {
+      if (isMounted) setScannerError('ক্যামেরা চালু করা যায়নি। ব্রাউজারে ক্যামেরা অনুমতি দিন অথবা কোডটি লিখুন।')
+    })
+
+    return () => {
+      isMounted = false
+      if (scanner.isScanning) {
+        scanner.stop().then(() => scanner.clear()).catch(() => {})
+      } else {
+        scanner.clear().catch(() => {})
+      }
+    }
+  }, [isScannerOpen])
 
   const selectView = (view) => {
     setActiveView(view)
@@ -78,7 +118,25 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
             <h2 className="text-2xl font-black text-slate-950">হাজিরা প্রদান</h2>
             {attendance.isActive && attendance.date ? (
               <form onSubmit={submitAttendance} className="max-w-sm mx-auto mt-6 space-y-4">
-                <p className="text-sm text-slate-500">তারিখ {attendance.date}-এর জন্য শিক্ষকের কাছ থেকে কোড নিয়ে নিচে লিখুন।</p>
+                <p className="text-sm text-slate-500">তারিখ {attendance.date}-এর জন্য QR স্ক্যান করুন অথবা শিক্ষকের কাছ থেকে কোড নিয়ে নিচে লিখুন।</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScannerError('')
+                    setIsScannerOpen(true)
+                  }}
+                  className="w-full py-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50 text-emerald-800 font-bold flex items-center justify-center gap-2 hover:bg-emerald-100"
+                >
+                  <ScanLine className="h-5 w-5" /> ক্যামেরা দিয়ে QR স্ক্যান করুন
+                </button>
+                {isScannerOpen && (
+                  <div className="rounded-2xl border border-emerald-200 bg-slate-950 p-3 text-left">
+                    <div id="attendance-qr-reader" className="overflow-hidden rounded-xl" />
+                    <p className="px-1 pt-3 text-xs text-emerald-100">শিক্ষকের QR কোডটি ক্যামেরার ফ্রেমের মধ্যে রাখুন।</p>
+                    {scannerError && <p className="px-1 pt-2 text-xs text-rose-300">{scannerError}</p>}
+                    <button type="button" onClick={() => setIsScannerOpen(false)} className="mt-3 w-full rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-white">স্ক্যান বন্ধ করুন</button>
+                  </div>
+                )}
                 <div className="relative"><KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" /><input required value={attendanceCode} onChange={(event) => setAttendanceCode(event.target.value.toUpperCase())} placeholder="20260906-1030-A7K2" className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
                 <button disabled={attendanceSaving} className="w-full py-3 rounded-2xl bg-emerald-700 text-white font-bold disabled:opacity-60">{attendanceSaving ? 'জমা হচ্ছে...' : 'আজকের হাজিরা দিন'}</button>
               </form>

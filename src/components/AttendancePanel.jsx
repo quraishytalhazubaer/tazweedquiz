@@ -1,5 +1,7 @@
-import { CalendarClock, Copy, KeyRound, Loader2, Power, Printer, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { CalendarClock, Copy, KeyRound, Loader2, Power, Printer, QrCode, RefreshCw } from 'lucide-react'
+import QRCode from 'qrcode'
+import { useEffect, useState } from 'react'
+import ibblLogo from '../assets/ibbplc.jpg'
 
 const getLocalDateKey = (date = new Date()) => {
   const year = date.getFullYear()
@@ -38,6 +40,37 @@ function AttendancePanel({
   const workingDays = getWorkingDays(fromDate, toDate)
   const [selectedBatch, setSelectedBatch] = useState('All')
   const [codeDate, setCodeDate] = useState(getLocalDateKey)
+  const [attendanceQr, setAttendanceQr] = useState('')
+
+  useEffect(() => {
+    let isCurrent = true
+
+    const createAttendanceQr = async () => {
+      if (!attendance.code || !attendance.isActive) {
+        setAttendanceQr('')
+        return
+      }
+
+      const attendanceUrl = new URL(window.location.href)
+      attendanceUrl.searchParams.set('attendance', attendance.code)
+      const qr = await QRCode.toDataURL(attendanceUrl.toString(), {
+        errorCorrectionLevel: 'H',
+        margin: 2,
+        width: 280,
+        color: { dark: '#064e3b', light: '#ffffff' },
+      })
+
+      if (isCurrent) setAttendanceQr(qr)
+    }
+
+    createAttendanceQr().catch(() => {
+      if (isCurrent) setAttendanceQr('')
+    })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [attendance.code, attendance.isActive])
 
   const loadReport = () => {
     if (fromDate > toDate) {
@@ -190,6 +223,28 @@ function AttendancePanel({
           </button>
         </div>
       </div>
+      {isActiveToday && attendanceQr && (
+        <div className="mt-6 flex flex-col md:flex-row items-center gap-5 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5">
+          <div className="relative shrink-0 rounded-xl bg-white p-3 shadow-sm">
+            <img src={attendanceQr} alt="আজকের হাজিরার QR কোড" className="h-52 w-52" />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="rounded-lg bg-white p-1.5 shadow-sm">
+                <img src={ibblLogo} alt="IBBL" className="h-11 w-11 rounded-full" />
+              </div>
+            </div>
+          </div>
+          <div className="text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start gap-2 text-emerald-900">
+              <QrCode className="h-5 w-5" />
+              <h4 className="font-black">QR দিয়ে হাজিরা</h4>
+            </div>
+            <p className="mt-2 max-w-md text-sm text-slate-600">
+              শিক্ষার্থীরা মোবাইল ক্যামেরা দিয়ে এই QR স্ক্যান করে হাজিরা ফর্ম খুলতে পারবে। QR-এ IBBL-এর লোগো যুক্ত আছে।
+            </p>
+            <p className="mt-2 text-xs font-bold text-emerald-800">স্ক্যান করার পর Submit চাপতে হবে।</p>
+          </div>
+        </div>
+      )}
       <div className="mt-6 border-t border-slate-100 pt-5">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5" aria-label="Today's attendance summary">
           <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
