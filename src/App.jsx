@@ -58,14 +58,12 @@ const getLocalDateKey = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
-const getLastFiveWorkingDays = (date = new Date()) => {
-  const days = [];
-  const cursor = new Date(date);
-  while (days.length < 5) {
-    if (cursor.getDay() !== 5 && cursor.getDay() !== 6) days.unshift(getLocalDateKey(cursor));
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return days;
+const getLastThreeDays = (date = new Date()) => {
+  const yesterday = new Date(date);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const tomorrow = new Date(date);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return [yesterday, date, tomorrow].map(getLocalDateKey);
 };
 
 const getWorkingDaysInRange = (fromDate, toDate) => {
@@ -73,7 +71,7 @@ const getWorkingDaysInRange = (fromDate, toDate) => {
   const cursor = new Date(`${toDate}T00:00:00`);
   const firstDate = new Date(`${fromDate}T00:00:00`);
   while (cursor >= firstDate) {
-    if (cursor.getDay() !== 5 && cursor.getDay() !== 6) days.unshift(getLocalDateKey(cursor));
+    days.unshift(getLocalDateKey(cursor));
     cursor.setDate(cursor.getDate() - 1);
   }
   return days;
@@ -428,7 +426,7 @@ export default function App() {
   const fetchAttendanceRecords = async (filters = {}) => {
     setLoadingAttendance(true);
     try {
-      const defaultWorkingDays = getLastFiveWorkingDays();
+      const defaultWorkingDays = getLastThreeDays();
       const workingDays = filters.workingDays || (
         filters.fromDate && filters.toDate
           ? getWorkingDaysInRange(filters.fromDate, filters.toDate)

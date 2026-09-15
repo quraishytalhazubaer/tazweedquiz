@@ -21,23 +21,26 @@ function AttendancePanel({
   onNotify,
   activeBatches = [],
 }) {
-  const getWorkingDays = (startDate, endDate = new Date()) => {
+  const getDateRange = (startDate, endDate) => {
     const days = []
-    const cursor = typeof endDate === 'string' ? new Date(`${endDate}T00:00:00`) : new Date(endDate)
-    const firstDate = startDate
-      ? (typeof startDate === 'string' ? new Date(`${startDate}T00:00:00`) : new Date(startDate))
-      : new Date(cursor)
-    while (startDate ? cursor >= firstDate : days.length < 5) {
+    const cursor = new Date(`${endDate}T00:00:00`)
+    const firstDate = new Date(`${startDate}T00:00:00`)
+    while (cursor >= firstDate) {
       const dateKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
-      if (startDate || (cursor.getDay() !== 5 && cursor.getDay() !== 6)) days.unshift(dateKey)
+      days.unshift(dateKey)
       cursor.setDate(cursor.getDate() - 1)
     }
     return days
   }
-  const initialWorkingDays = getWorkingDays()
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const initialWorkingDays = [yesterday, today, tomorrow].map(getLocalDateKey)
   const [fromDate, setFromDate] = useState(initialWorkingDays[0])
   const [toDate, setToDate] = useState(initialWorkingDays[initialWorkingDays.length - 1])
-  const workingDays = getWorkingDays(fromDate, toDate)
+  const workingDays = getDateRange(fromDate, toDate)
   const [selectedBatch, setSelectedBatch] = useState('All')
   const [codeDate, setCodeDate] = useState(getLocalDateKey)
   const [attendanceQr, setAttendanceQr] = useState('')
