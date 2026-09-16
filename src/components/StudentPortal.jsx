@@ -1,4 +1,4 @@
-import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, KeyRound, Menu, Pencil, QrCode, ScanLine, UserRound, X } from 'lucide-react'
+import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, KeyRound, Pencil, QrCode, ScanLine, UserRound, X } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useEffect, useState } from 'react'
 import CourseMaterials from './CourseMaterials'
@@ -11,9 +11,11 @@ const navigation = [
   { id: 'profile', label: 'প্রোফাইল এডিট', icon: Pencil },
 ]
 
-function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit }) {
-  const [activeView, setActiveView] = useState('materials')
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit, isDrawerOpen, onDrawerClose }) {
+  const [activeView, setActiveView] = useState(() => {
+    const savedView = sessionStorage.getItem('studentPage')
+    return navigation.some((item) => item.id === savedView) ? savedView : 'materials'
+  })
   const [attendanceCode, setAttendanceCode] = useState(() => (
     new URLSearchParams(window.location.search).get('attendance')?.toUpperCase() || ''
   ))
@@ -58,7 +60,8 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
 
   const selectView = (view) => {
     setActiveView(view)
-    setIsDrawerOpen(false)
+    sessionStorage.setItem('studentPage', view)
+    onDrawerClose()
   }
 
   const submitAttendance = async (event) => {
@@ -106,9 +109,6 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
       </aside>
 
       <main className="min-w-0">
-        <button type="button" onClick={() => setIsDrawerOpen(true)} className="lg:hidden mb-4 flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm text-sm font-black text-emerald-800">
-          <Menu className="h-5 w-5" /> মেনু খুলুন
-        </button>
         {activeView === 'materials' && <CourseMaterials onNotify={onNotify} />}
         {activeView === 'profile' && <ProfileEdit profile={profile} onSave={onProfileSave} saving={profileSaving} activeBatches={activeBatches} />}
         {activeView === 'exam' && examView}
@@ -179,10 +179,10 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
 
       {isDrawerOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
-          <button type="button" aria-label="মেনু বন্ধ করুন" onClick={() => setIsDrawerOpen(false)} className="absolute inset-0 bg-slate-950/40" />
+          <button type="button" aria-label="মেনু বন্ধ করুন" onClick={onDrawerClose} className="absolute inset-0 bg-slate-950/40" />
           <aside className="relative z-10 w-[min(85vw,320px)] h-full bg-white p-4 shadow-2xl animate-slide-in">
             <div className="flex justify-end mb-2">
-              <button type="button" onClick={() => setIsDrawerOpen(false)} className="p-2 text-slate-500 hover:text-slate-900" title="মেনু বন্ধ করুন">
+              <button type="button" onClick={onDrawerClose} className="p-2 text-slate-500 hover:text-slate-900" title="মেনু বন্ধ করুন">
                 <X className="h-5 w-5" />
               </button>
             </div>

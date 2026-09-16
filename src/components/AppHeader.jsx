@@ -1,6 +1,6 @@
-import { ClipboardCheck, LogOut, User } from 'lucide-react'
+import { ClipboardCheck, LogOut, Menu, User } from 'lucide-react'
 
-function AppHeader({ user, onLogout }) {
+function AppHeader({ user, onLogout, onMenuOpen }) {
   if (!user) return null
 
   return (
@@ -18,6 +18,17 @@ function AppHeader({ user, onLogout }) {
           </div>
 
           <div className="flex items-center gap-4">
+            {user.role === 'student' && (
+              <button
+                type="button"
+                onClick={onMenuOpen}
+                aria-label="মেনু খুলুন"
+                title="মেনু খুলুন"
+                className="lg:hidden p-2.5 text-emerald-800 hover:bg-emerald-50 rounded-xl transition-colors"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            )}
             <div className="hidden sm:flex items-center gap-2.5 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-150">
               <User className="h-4 w-4 text-[#1B4D1A]" />
               <span className="text-xs font-extrabold text-slate-700">

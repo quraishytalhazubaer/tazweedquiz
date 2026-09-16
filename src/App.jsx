@@ -113,6 +113,7 @@ export default function App() {
   const [activeBatches, setActiveBatches] = useState([]);
   const [allBatches, setAllBatches] = useState([]); // Master list of all batches
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isStudentMenuOpen, setIsStudentMenuOpen] = useState(false);
   const [teacherPage, setTeacherPage] = useState(() => sessionStorage.getItem('teacherPage') || (sessionStorage.getItem('teacherView') === 'users' ? 'users' : 'exam'));
   const [isDatabaseReachable, setIsDatabaseReachable] = useState(null); 
   const [checkingConnection, setCheckingConnection] = useState(true);
@@ -965,7 +966,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-emerald-100 selection:text-emerald-900 transition-colors duration-300">
       
       <NotificationToast notification={notification} onClose={() => setNotification(null)} />
-      <AppHeader user={user} onLogout={handleLogout} />
+      <AppHeader user={user} onLogout={handleLogout} onMenuOpen={() => setIsStudentMenuOpen(true)} />
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -1060,6 +1061,8 @@ export default function App() {
             attendance={attendance}
             attendanceRecords={studentAttendanceRecords}
             onAttendanceSubmit={handleStudentAttendance}
+            isDrawerOpen={isStudentMenuOpen}
+            onDrawerClose={() => setIsStudentMenuOpen(false)}
             examView={
               <StudentTerminalComponent
                 formData={formData}
