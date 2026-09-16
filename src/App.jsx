@@ -132,6 +132,7 @@ export default function App() {
   });
 
   const [submitStatus, setSubmitStatus] = useState(null);
+  const [studentSubmission, setStudentSubmission] = useState(null);
 
   // Teacher dashboard state
   const [submissions, setSubmissions] = useState([]);
@@ -328,6 +329,49 @@ export default function App() {
 
   useEffect(() => {
     if (user?.role === 'student') fetchStudentAttendance(user.user.id);
+  }, [user]);
+
+  useEffect(() => {
+    if (user?.role !== 'student') return;
+
+    const loadStudentSubmission = async () => {
+      const { data, error } = await supabase
+        .from('submissions')
+        .select('status, marks, batch')
+        .eq('profile_id', user.user.id)
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Failed to load student submission:', error);
+        return;
+      }
+
+      setStudentSubmission(data);
+    };
+
+    loadStudentSubmission();
+
+    const submissionChannel = supabase
+      .channel(`student-submission-${user.user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'submissions',
+        filter: `profile_id=eq.${user.user.id}`,
+      }, (payload) => {
+        setStudentSubmission({
+          status: payload.new.status,
+          marks: payload.new.marks,
+          batch: payload.new.batch,
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(submissionChannel);
+    };
   }, [user]);
 
   useEffect(() => {
@@ -609,6 +653,7 @@ export default function App() {
       if (insertError) throw insertError;
 
       setSubmitStatus('success');
+      setStudentSubmission({ status: null, marks: score, batch: formData.batch });
       localStorage.removeItem("examAnswers");
       triggerNotification("আপনার উত্তরপত্র সফলভাবে গৃহীত হয়েছে।", "success");
     } catch (err) {
@@ -1069,6 +1114,7 @@ export default function App() {
                 onChange={handleStudentFormChange}
                 onSubmit={handleStudentSubmit}
                 submitStatus={submitStatus}
+                gradedMarks={studentSubmission?.status?.toLowerCase() === 'graded' ? studentSubmission.marks : null}
                 isExamActive={isExamActive}
                 activeBatches={activeBatches}
                 isSheetyReachable={isDatabaseReachable}

@@ -5,6 +5,7 @@ function StudentTerminal({
   onChange,
   onSubmit,
   submitStatus,
+  gradedMarks,
   isExamActive,
   isSheetyReachable,
   checkingConnection,
@@ -55,7 +56,14 @@ function StudentTerminal({
         <h2 className="text-3xl font-extrabold text-emerald-800">আলহামদুলিল্লাহ!</h2>
         <p className="text-slate-600 font-medium mt-3 text-lg">আপনার উত্তরপত্র সফলভাবে জমা নেওয়া হয়েছে।</p>
         <div className="mt-8 pt-6 border-t border-slate-100">
-          <p className="text-sm text-slate-500">আপনার অটো-গ্রেডিং সম্পন্ন হয়েছে। শিক্ষক খাতা মূল্যায়ন শেষে আপনার ফলাফল প্রকাশ করবেন।</p>
+          {gradedMarks !== null && gradedMarks !== undefined ? (
+            <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-5 py-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Written Marks</p>
+              <p className="mt-1 text-3xl font-black text-emerald-900">{gradedMarks} / 10</p>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">আপনার অটো-গ্রেডিং সম্পন্ন হয়েছে। শিক্ষক খাতা মূল্যায়ন শেষে আপনার ফলাফল প্রকাশ করবেন।</p>
+          )}
         </div>
       </div>
     )
@@ -75,6 +83,16 @@ function StudentTerminal({
           <span>তারিখ: {new Date().toLocaleDateString('bn-BD')}</span>
         </div>
       </div>
+
+      {gradedMarks !== null && gradedMarks !== undefined && (
+        <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm px-6 py-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Written Marks</p>
+            <p className="mt-1 text-sm text-slate-500">আপনার লিখিত অংশের অটো-গণনাকৃত নম্বর</p>
+          </div>
+          <p className="text-2xl font-black text-emerald-800 whitespace-nowrap">{gradedMarks} / 10</p>
+        </div>
+      )}
 
       {isExamActive ? (
         <form onSubmit={onSubmit} className="space-y-8">
