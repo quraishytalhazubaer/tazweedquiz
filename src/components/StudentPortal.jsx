@@ -1,4 +1,4 @@
-import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, KeyRound, Pencil, QrCode, ScanLine, UserRound, X } from 'lucide-react'
+import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, KeyRound, LogOut, Pencil, QrCode, ScanLine, UserRound, X } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useEffect, useState } from 'react'
 import CourseMaterials from './CourseMaterials'
@@ -11,10 +11,11 @@ const navigation = [
   { id: 'profile', label: 'প্রোফাইল এডিট', icon: Pencil },
 ]
 
-function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit, isDrawerOpen, onDrawerClose }) {
+function StudentPortal({ profile, isArchived = false, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit, isDrawerOpen, onDrawerClose, onLogout }) {
+  const availableNavigation = isArchived ? navigation.filter((item) => item.id === 'materials') : navigation
   const [activeView, setActiveView] = useState(() => {
     const savedView = sessionStorage.getItem('studentPage')
-    return navigation.some((item) => item.id === savedView) ? savedView : 'materials'
+    return availableNavigation.some((item) => item.id === savedView) ? savedView : 'materials'
   })
   const [attendanceCode, setAttendanceCode] = useState(() => (
     new URLSearchParams(window.location.search).get('attendance')?.toUpperCase() || ''
@@ -22,6 +23,7 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
   const [attendanceSaving, setAttendanceSaving] = useState(false)
   const [isScannerOpen, setIsScannerOpen] = useState(false)
   const [scannerError, setScannerError] = useState('')
+  const visibleActiveView = isArchived ? 'materials' : activeView
 
   useEffect(() => {
     if (!isScannerOpen) return undefined
@@ -59,6 +61,7 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
   }, [isScannerOpen])
 
   const selectView = (view) => {
+    if (isArchived && view !== 'materials') return
     setActiveView(view)
     sessionStorage.setItem('studentPage', view)
     onDrawerClose()
@@ -90,10 +93,10 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
         </div>
       </div>
       <nav className="space-y-1">
-        {navigation.map((item) => {
+        {availableNavigation.map((item) => {
           const Icon = item.icon
           return (
-            <button key={item.id} type="button" onClick={() => selectView(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-bold transition ${activeView === item.id ? 'bg-emerald-50 text-emerald-800 border-l-4 border-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <button key={item.id} type="button" onClick={() => selectView(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-bold transition ${visibleActiveView === item.id ? 'bg-emerald-50 text-emerald-800 border-l-4 border-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
               <Icon className="h-4 w-4" /> {item.label}
             </button>
           )
@@ -109,10 +112,15 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
       </aside>
 
       <main className="min-w-0">
-        {activeView === 'materials' && <CourseMaterials onNotify={onNotify} />}
-        {activeView === 'profile' && <ProfileEdit profile={profile} onSave={onProfileSave} saving={profileSaving} activeBatches={activeBatches} />}
-        {activeView === 'exam' && examView}
-        {activeView === 'attendance' && (
+        {isArchived && (
+          <div className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-900 animate-slide-in">
+            আপনার ব্যাচ আর্কাইভ করা হয়েছে। আপনি শুধু কোর্স মেটেরিয়াল দেখতে পারবেন।
+          </div>
+        )}
+        {visibleActiveView === 'materials' && <CourseMaterials onNotify={onNotify} />}
+        {!isArchived && visibleActiveView === 'profile' && <ProfileEdit profile={profile} onSave={onProfileSave} saving={profileSaving} activeBatches={activeBatches} />}
+        {!isArchived && visibleActiveView === 'exam' && examView}
+        {!isArchived && visibleActiveView === 'attendance' && (
           <section className="bg-white rounded-3xl border border-slate-200/70 shadow-sm p-8 text-center animate-slide-in">
             <QrCode className="h-12 w-12 mx-auto text-emerald-700 mb-4" />
             <h2 className="text-2xl font-black text-slate-950">হাজিরা প্রদান</h2>
@@ -180,13 +188,20 @@ function StudentPortal({ profile, onProfileSave, profileSaving, examView, onNoti
       {isDrawerOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
           <button type="button" aria-label="মেনু বন্ধ করুন" onClick={onDrawerClose} className="absolute inset-0 bg-slate-950/40" />
-          <aside className="relative z-10 w-[min(85vw,320px)] h-full bg-white p-4 shadow-2xl animate-slide-in">
+          <aside className="relative z-10 flex h-full w-[min(85vw,320px)] flex-col bg-white p-4 shadow-2xl animate-slide-in">
             <div className="flex justify-end mb-2">
               <button type="button" onClick={onDrawerClose} className="p-2 text-slate-500 hover:text-slate-900" title="মেনু বন্ধ করুন">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            {navigationContent}
+            <div className="flex-1 overflow-y-auto">{navigationContent}</div>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="mt-auto flex w-full items-center gap-2 rounded-2xl border border-rose-200 px-4 py-3 text-xs font-black uppercase tracking-wider text-rose-600 transition-all hover:border-transparent hover:bg-rose-600 hover:text-white"
+            >
+              <LogOut className="h-4 w-4" /> Log out
+            </button>
           </aside>
         </div>
       )}

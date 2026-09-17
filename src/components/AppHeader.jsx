@@ -37,7 +37,7 @@ function AppHeader({ user, onLogout, onMenuOpen }) {
             </div>
             <button
               onClick={onLogout}
-              className="flex items-center gap-2 text-rose-600 hover:text-white hover:bg-rose-600 px-4 py-2.5 rounded-2xl border border-rose-200 hover:border-transparent transition-all duration-250 text-xs font-black uppercase tracking-wider"
+              className={`${user.role === 'teacher' ? 'flex' : 'hidden sm:flex'} items-center gap-2 text-rose-600 hover:text-white hover:bg-rose-600 px-4 py-2.5 rounded-2xl border border-rose-200 hover:border-transparent transition-all duration-250 text-xs font-black uppercase tracking-wider`}
             >
               <LogOut className="h-4 w-4" /> Log out
             </button>

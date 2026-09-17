@@ -1,32 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  ClipboardCheck, 
-  Clock, 
-  RefreshCw, 
-  CalendarDays, 
-  User, 
-  LogOut, 
-  ShieldCheck, 
-  Settings, 
-  Download, 
-  Play, 
-  FileText, 
-  CheckCircle2, 
-  XCircle, 
-  AlertCircle, 
-  ChevronLeft, 
-  Save, 
-  Search,
-  CheckSquare,
-  Lock,
-  ChevronRight,
-  BookOpen,
-  Loader2,
-  Check,
-  X,
-  SlidersHorizontal,
-  GraduationCap
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 // Import the database engine from the file right next to App.jsx
 import { supabase } from './supabaseClient'; 
@@ -157,6 +129,10 @@ export default function App() {
     batch: [],
   });
   const [profileSaving, setProfileSaving] = useState(false);
+  const studentBatches = Array.isArray(studentProfile.batch) ? studentProfile.batch : [];
+  const studentIsArchived = user?.role === 'student' &&
+    studentBatches.length > 0 &&
+    !studentBatches.some((batch) => activeBatches.includes(batch));
 
   const triggerNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -264,6 +240,12 @@ export default function App() {
       .channel('public:exam_config')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'exam_config', filter: 'id=eq.1' }, (payload) => {
         setIsExamActive(payload.new.is_active);
+        const active = payload.new.active_batches || [];
+        const master = payload.new.all_batches && payload.new.all_batches.length > 0
+          ? payload.new.all_batches
+          : active;
+        setActiveBatches(active);
+        setAllBatches(master);
         setAttendance({
           isActive: Boolean(payload.new.attendance_is_active),
           code: payload.new.attendance_code || '',
@@ -560,6 +542,10 @@ export default function App() {
 
   const handleStudentSubmit = async (e) => {
     e.preventDefault();
+    if (studentIsArchived) {
+      triggerNotification('আর্কাইভ করা শিক্ষার্থীরা শুধু কোর্স মেটেরিয়াল দেখতে পারেন।', 'error');
+      return;
+    }
     if (!formData.userName || !formData.userId || !formData.userBranch) {
       triggerNotification("দয়া করে আপনার নাম, আইডি এবং ব্রাঞ্চ পূরণ করুন।", "error");
       return;
@@ -739,6 +725,9 @@ export default function App() {
   };
 
   const handleStudentAttendance = async (code) => {
+    if (studentIsArchived) {
+      throw new Error('আর্কাইভ করা শিক্ষার্থীরা হাজিরা দিতে পারেন না।');
+    }
     const { data: config, error: configError } = await supabase
       .from('exam_config')
       .select('attendance_is_active, attendance_code, attendance_date')
@@ -902,6 +891,13 @@ export default function App() {
     }
   };
 
+  const handleToggleBatchStatus = (batch) => handleSaveConfig({
+    activeBatches: activeBatches.includes(batch)
+      ? activeBatches.filter((activeBatch) => activeBatch !== batch)
+      : [...activeBatches, batch],
+    allBatches,
+  });
+
   const handleToggleAllGraded = async (isGradedAll) => {
     const targetStatus = isGradedAll ? 'Graded' : 'Evaluated';
 
@@ -960,6 +956,10 @@ export default function App() {
   };
 
   const handleStudentProfileSave = async (profile) => {
+    if (studentIsArchived) {
+      triggerNotification('আর্কাইভ করা শিক্ষার্থীরা প্রোফাইল পরিবর্তন করতে পারেন না।', 'error');
+      return;
+    }
     setProfileSaving(true);
     try {
       const profileBatches = Array.from(new Set(
@@ -1053,6 +1053,7 @@ export default function App() {
                 onNotify={triggerNotification}
                 onBack={() => handleTeacherPageChange('exam')}
                 activeBatches={activeBatches}
+                onToggleBatchStatus={handleToggleBatchStatus}
               />
             )}
             {teacherPage === 'exam' && <>
@@ -1099,6 +1100,7 @@ export default function App() {
         ) : (
           <StudentPortal
             profile={studentProfile}
+            isArchived={studentIsArchived}
             onProfileSave={handleStudentProfileSave}
             profileSaving={profileSaving}
             activeBatches={activeBatches}
@@ -1108,6 +1110,7 @@ export default function App() {
             onAttendanceSubmit={handleStudentAttendance}
             isDrawerOpen={isStudentMenuOpen}
             onDrawerClose={() => setIsStudentMenuOpen(false)}
+            onLogout={handleLogout}
             examView={
               <StudentTerminalComponent
                 formData={formData}

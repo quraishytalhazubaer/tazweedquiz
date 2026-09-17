@@ -81,11 +81,6 @@ export default function SettingsModal({
   };
 
   const handleSave = async () => {
-    if (activeBatches.length === 0) {
-      triggerNotification('কমপক্ষে একটি ব্যাচ সক্রিয় রাখতে হবে।', 'error');
-      return;
-    }
-
     setSaving(true);
     try {
       await onSaveConfig({
@@ -158,7 +153,7 @@ export default function SettingsModal({
         <div className="space-y-3">
           <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
             <Layers className="h-4 w-4 text-emerald-700" />
-            সক্রিয় ব্যাচ নির্বাচন (Active Batches)
+            ব্যাচ পরিচালনা (Active / Archived)
           </label>
           
           <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-3 bg-slate-50/50 rounded-2xl border border-slate-150">
@@ -177,7 +172,7 @@ export default function SettingsModal({
                 >
                   <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : 'bg-slate-300'}`} />
                   {batch}
-                  {isActive && <Check className="h-3.5 w-3.5 ml-1" />}
+                  {isActive ? <Check className="h-3.5 w-3.5 ml-1" /> : <span className="text-[10px] font-black uppercase text-slate-400">Archived</span>}
                 </button>
               );
             })}

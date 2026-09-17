@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
+  Archive,
+  ArchiveRestore,
   BarChart3,
   Check,
   CheckCircle2,
@@ -18,7 +20,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 
-function AdminUserManagement({ onNotify, onBack, activeBatches = [] }) {
+function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBatchStatus }) {
   const [users, setUsers] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [passwords, setPasswords] = useState({});
@@ -171,6 +173,23 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [] }) {
       onNotify(`${selectedIds.length}টি user-কে ${batch} batch assign করা হয়েছে।`, "success");
     }
     setWorking(false);
+  };
+
+  const toggleBatchStatus = async (batch) => {
+    if (!onToggleBatchStatus) return;
+    const isActive = activeBatches.includes(batch);
+    const action = isActive ? "archive" : "unarchive";
+    if (!window.confirm(`${batch} batch-এর সব student ${action} করবেন?`)) return;
+
+    setWorking(true);
+    try {
+      await onToggleBatchStatus(batch);
+      await loadUsers();
+    } catch (error) {
+      onNotify(`Batch ${action} করা যায়নি: ${error.message}`, "error");
+    } finally {
+      setWorking(false);
+    }
   };
 
   const renderUser = (user) => (
@@ -413,6 +432,17 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [] }) {
                   >
                     সব pending নির্বাচন
                   </button>
+                  {batch !== "Unassigned" && (
+                    <button
+                      type="button"
+                      onClick={() => toggleBatchStatus(batch)}
+                      disabled={working}
+                      className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-50 ${activeBatches.includes(batch) ? "border-amber-200 text-amber-800 hover:bg-amber-50" : "border-emerald-200 text-emerald-800 hover:bg-emerald-50"}`}
+                    >
+                      {activeBatches.includes(batch) ? <Archive className="h-3.5 w-3.5" /> : <ArchiveRestore className="h-3.5 w-3.5" />}
+                      {activeBatches.includes(batch) ? "Archive batch" : "Unarchive batch"}
+                    </button>
+                  )}
                 </div>
                 {isExpanded && (
                   <div className="space-y-3 p-3">
