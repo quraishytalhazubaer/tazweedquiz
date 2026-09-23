@@ -1,4 +1,4 @@
-import QUESTIONS from '../constants/questions';
+import QUESTIONS from '../constants/mcqquestions';
 
 // --- 1. Comprehensive Script Loader (Exposes all global namespaces cleanly) ---
 const loadAllPdfLibraries = () => {

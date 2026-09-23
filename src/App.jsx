@@ -14,7 +14,7 @@ import AdminUserManagement from './components/AdminUserManagement';
 import TeacherDashboardComponent from './components/TeacherDashboard';
 import GradingWorkspaceComponent from './components/GradingWorkspace';
 import ConfigModal from './components/SettingsModal';
-import QUESTIONS from './constants/questions';
+import QUESTIONS from './constants/mcqquestions';
 import { handleExportExcel, generateSummaryPDF, generateIndividualPDF } from './utils/reports';
 
 // ============================================================================
