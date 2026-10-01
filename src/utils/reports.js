@@ -115,15 +115,22 @@ export const generateSummaryPDF = async (submissions, notify) => {
 
     // Explicit Type Conversion to Strings
     const tableHeaders = [['SL', 'Emp. ID', 'Name', 'Branch', 'Written (10)', 'Viva (5)', 'Total Marks (15)']];
-    const tableRows = submissions.map((sub, index) => [
-      String(index + 1),
-      String(sub.userId || '---'),
-      String(sub.userName || '---'),
-      String(sub.userBranch || '---'),
-      String(sub.marks !== undefined ? sub.marks : '---'),
-      String(sub.viva_marks !== undefined ? sub.viva_marks : '---'),
-      String(sub.total_marks !== undefined ? sub.total_marks : '---')
-    ]);
+    const tableRows = submissions.map((sub, index) => {
+      const writtenMarks = Number.isFinite(Number(sub.marks)) ? Number(sub.marks) : 0;
+      const vivaMarks = sub.viva_marks == null || !Number.isFinite(Number(sub.viva_marks))
+        ? 0
+        : Number(sub.viva_marks);
+
+      return [
+        String(index + 1),
+        String(sub.userId || '---'),
+        String(sub.userName || '---'),
+        String(sub.userBranch || '---'),
+        String(sub.marks == null ? '---' : writtenMarks),
+        String(vivaMarks),
+        String(writtenMarks + vivaMarks),
+      ];
+    });
 
     // Render Table using the newly exposed global plugin namespace
     doc.autoTable({
