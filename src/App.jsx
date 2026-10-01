@@ -16,6 +16,7 @@ import GradingWorkspaceComponent from './components/GradingWorkspace';
 import ConfigModal from './components/SettingsModal';
 import QUESTIONS from './constants/mcqquestions';
 import { handleExportExcel, generateSummaryPDF, generateIndividualPDF } from './utils/reports';
+import { hasTeacherPermission } from './constants/teacherPermissions';
 
 // ============================================================================
 // 1. CENTRAL PARAMETERS
@@ -133,6 +134,13 @@ export default function App() {
   const studentIsArchived = user?.role === 'student' &&
     studentBatches.length > 0 &&
     !studentBatches.some((batch) => activeBatches.includes(batch));
+  const teacherPages = [
+    ...(hasTeacherPermission(user, 'materials') ? ['materials'] : []),
+    ...(hasTeacherPermission(user, 'exam') || hasTeacherPermission(user, 'marks') || hasTeacherPermission(user, 'grading') ? ['exam'] : []),
+    ...(hasTeacherPermission(user, 'attendance') ? ['attendance'] : []),
+    ...(user?.role === 'admin' ? ['users'] : []),
+  ];
+  const visibleTeacherPage = teacherPages.includes(teacherPage) ? teacherPage : teacherPages[0] || '';
 
   const triggerNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -172,7 +180,7 @@ export default function App() {
 
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role, full_name, approved')
+        .select('role, full_name, approved, teacher_permissions')
         .eq('id', session.user.id)
         .single();
 
@@ -185,6 +193,7 @@ export default function App() {
         setUser({
           role: profile.role,
           name: profile.full_name,
+          permissions: profile.teacher_permissions || {},
           user: session.user,
         });
       }
@@ -254,7 +263,7 @@ export default function App() {
         });
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance_records' }, () => {
-        if (user?.role === 'teacher') fetchAttendanceRecords();
+        if (hasTeacherPermission(user, 'attendance')) fetchAttendanceRecords();
       })
       .subscribe();
 
@@ -265,9 +274,9 @@ export default function App() {
 
   // 2. Automated data fetching upon teacher verification updates
   useEffect(() => {
-    if (user?.role === 'teacher') {
-      fetchSubmissions();
-      fetchAttendanceRecords();
+    if (['teacher', 'admin'].includes(user?.role)) {
+      if (hasTeacherPermission(user, 'exam') || hasTeacherPermission(user, 'marks') || hasTeacherPermission(user, 'grading')) fetchSubmissions();
+      if (hasTeacherPermission(user, 'attendance')) fetchAttendanceRecords();
     }
   }, [user]);
 
@@ -413,12 +422,18 @@ export default function App() {
     }
   };
 
-  const fetchSubmissions = async () => {
+  async function fetchSubmissions() {
     setLoadingSubmissions(true);
     try {
+      const submissionColumns = [
+        'id, profile_id, user_name, user_id, user_branch, designation, batch, date, timestamp',
+        ...(hasTeacherPermission(user, 'marks') ? ['status, marks, viva_marks, total_marks'] : []),
+        ...(hasTeacherPermission(user, 'grading') ? ['answers'] : []),
+        'profile:profiles(full_name, employee_id, branch, designation, batch)',
+      ].join(', ');
       const { data, error } = await supabase
         .from('submissions')
-        .select('*, profile:profiles(full_name, employee_id, branch, designation, batch)')
+        .select(submissionColumns)
         .order('id', { ascending: false });
 
       if (error) throw error;
@@ -448,9 +463,9 @@ export default function App() {
     } finally {
       setLoadingSubmissions(false);
     }
-  };
+  }
 
-  const fetchAttendanceRecords = async (filters = {}) => {
+  async function fetchAttendanceRecords(filters = {}) {
     setLoadingAttendance(true);
     try {
       const defaultWorkingDays = getLastThreeDays();
@@ -527,7 +542,7 @@ export default function App() {
     } finally {
       setLoadingAttendance(false);
     }
-  };
+  }
 
   const handleStudentFormChange = (key, value) => {
     setFormData(prev => {
@@ -666,6 +681,7 @@ export default function App() {
   };
 
   const handleToggleExamStatus = async (newStatus) => {
+    if (!hasTeacherPermission(user, 'exam', 'edit')) return triggerNotification('আপনার exam edit permission নেই।', 'error');
     try {
       const { error } = await supabase
         .from('exam_config')
@@ -683,6 +699,7 @@ export default function App() {
   };
 
   const handleAttendanceUpdate = async (updates, successMessage) => {
+    if (!hasTeacherPermission(user, 'attendance', 'edit')) return triggerNotification('আপনার attendance edit permission নেই।', 'error');
     try {
       const { data, error } = await supabase
         .from('exam_config')
@@ -755,12 +772,13 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (user?.role === 'teacher' && (!attendance.code || attendance.date !== getLocalDateKey())) {
+    if (['teacher', 'admin'].includes(user?.role) && hasTeacherPermission(user, 'attendance', 'edit') && (!attendance.code || attendance.date !== getLocalDateKey())) {
       handleRegenerateAttendance();
     }
   }, [user]);
 
   const handleUpdateMarks = async (submissionId, newMarks, identityDraft) => {
+    if (!hasTeacherPermission(user, 'grading', 'edit')) return triggerNotification('আপনার grading edit permission নেই।', 'error');
     setSavingMarks(true);
     const parsedMarks = parseFloat(newMarks);
     const studentId = identityDraft?.userId?.trim();
@@ -818,6 +836,7 @@ export default function App() {
   };
 
   const handleUpdateVivaMarks = async (submissionId, vivaValue) => {
+    if (!hasTeacherPermission(user, 'marks', 'edit')) return triggerNotification('আপনার marks edit permission নেই।', 'error');
     const numericViva = vivaValue === '' ? null : parseFloat(vivaValue);
 
     // Find target submission to sum existing `marks` + `viva_marks`
@@ -864,6 +883,7 @@ export default function App() {
   };
 
   const handleSaveConfig = async ({ activeBatches, allBatches }) => {
+    if (!hasTeacherPermission(user, 'exam', 'edit')) throw new Error('Exam edit permission required.');
     try {
       const { error } = await supabase
         .from('exam_config')
@@ -899,6 +919,7 @@ export default function App() {
   });
 
   const handleToggleAllGraded = async (isGradedAll) => {
+    if (!hasTeacherPermission(user, 'grading', 'edit')) return triggerNotification('আপনার grading edit permission নেই।', 'error');
     const targetStatus = isGradedAll ? 'Graded' : 'Evaluated';
 
     // 1. Update React Local State
@@ -946,6 +967,7 @@ export default function App() {
   };
 
   const handleTeacherPageChange = (page) => {
+    if (!teacherPages.includes(page)) return;
     setTeacherPage(page);
     sessionStorage.setItem('teacherPage', page);
     if (page === 'users') {
@@ -1021,7 +1043,7 @@ export default function App() {
             teacherPassword={TEACHER_PASSWORD}
             studentAccessCode={STUDENT_ACCESS_CODE}
           />
-        ) : user.role === 'teacher' ? (
+        ) : ['teacher', 'admin'].includes(user.role) ? (
           gradingSubmission ? (
             <GradingWorkspaceComponent 
               submission={gradingSubmission} 
@@ -1029,12 +1051,14 @@ export default function App() {
               onSaveMarks={handleUpdateMarks}
               saving={savingMarks}
               questions={QUESTIONS}
+              canEdit={hasTeacherPermission(user, 'grading', 'edit')}
             />
           ) : (
             <>
-            <TeacherNavigation activePage={teacherPage} onPageChange={handleTeacherPageChange} />
-            {teacherPage === 'materials' && <CourseMaterials canManage onNotify={triggerNotification} />}
-            {teacherPage === 'attendance' && (
+            <TeacherNavigation activePage={visibleTeacherPage} onPageChange={handleTeacherPageChange} pages={teacherPages} />
+            {!visibleTeacherPage && <p className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-900">আপনার কোনো staff feature access এখনো দেওয়া হয়নি। Admin-এর সঙ্গে যোগাযোগ করুন।</p>}
+            {visibleTeacherPage === 'materials' && <CourseMaterials canManage={hasTeacherPermission(user, 'materials', 'edit')} onNotify={triggerNotification} />}
+            {visibleTeacherPage === 'attendance' && (
               <AttendancePanel
                 attendance={attendance}
                 attendanceRecords={attendanceRecords}
@@ -1046,9 +1070,10 @@ export default function App() {
                 onRefreshAttendance={fetchAttendanceRecords}
                 onNotify={triggerNotification}
                 activeBatches={activeBatches}
+                canEdit={hasTeacherPermission(user, 'attendance', 'edit')}
               />
             )}
-            {teacherPage === 'users' && (
+            {visibleTeacherPage === 'users' && user.role === 'admin' && (
               <AdminUserManagement
                 onNotify={triggerNotification}
                 onBack={() => handleTeacherPageChange('exam')}
@@ -1056,7 +1081,7 @@ export default function App() {
                 onToggleBatchStatus={handleToggleBatchStatus}
               />
             )}
-            {teacherPage === 'exam' && <>
+            {visibleTeacherPage === 'exam' && <>
               <TeacherDashboardComponent 
               submissions={submissions}
               selectedIds={selectedIds}
@@ -1081,10 +1106,14 @@ export default function App() {
               onExportExcel={handleExportExcel}
               onGenerateSummaryPDF={generateSummaryPDF}
               onGenerateIndividualPDF={generateIndividualPDF}
-              onManageUsers={() => handleTeacherPageChange('users')}
+              onManageUsers={user.role === 'admin' ? () => handleTeacherPageChange('users') : undefined}
+              canManageExam={hasTeacherPermission(user, 'exam', 'edit')}
+              canViewMarks={hasTeacherPermission(user, 'marks')}
+              canEditMarks={hasTeacherPermission(user, 'marks', 'edit')}
+              canGrade={hasTeacherPermission(user, 'grading')}
             />
             {/* Settings Configuration Modal */}
-              <ConfigModal
+              {hasTeacherPermission(user, 'exam', 'edit') && <ConfigModal
                 isOpen={isConfigModalOpen}
                 onClose={() => setIsConfigModalOpen(false)}
                 onSaveConfig={handleSaveConfig}
@@ -1092,8 +1121,9 @@ export default function App() {
                 currentActiveBatches={activeBatches}
                 submissions={submissions}
                 onToggleAllGraded={handleToggleAllGraded}
+                canToggleAllGraded={hasTeacherPermission(user, 'grading', 'edit')}
                 triggerNotification={triggerNotification}
-              />
+              />}
             </>}
             </>
           )

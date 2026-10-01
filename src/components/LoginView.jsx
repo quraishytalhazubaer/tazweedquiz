@@ -96,7 +96,7 @@ function LoginView({ onLogin, teacherPassword }) {
         // 2. Query user profile record from the profiles table
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('role, full_name, approved')
+          .select('role, full_name, approved, teacher_permissions')
           .eq('id', authData.user.id)
           .single()
 
@@ -111,9 +111,12 @@ function LoginView({ onLogin, teacherPassword }) {
         }
 
         // 3. Verify user's database role matches current UI portal tab
-        if (profile.role !== role) {
+        const roleMatchesPortal = role === 'teacher'
+          ? ['teacher', 'admin'].includes(profile.role)
+          : profile.role === 'student'
+        if (!roleMatchesPortal) {
           await supabase.auth.signOut()
-          setError(`এই অ্যাকাউন্টটি ${profile.role === 'teacher' ? 'শিক্ষক' : 'ছাত্র'} হিসেবে নিবন্ধিত। সঠিক ট্যাবে গিয়ে লগইন করুন।`)
+          setError(`এই অ্যাকাউন্টটি ${profile.role === 'student' ? 'ছাত্র' : 'শিক্ষক'} হিসেবে নিবন্ধিত। সঠিক ট্যাবে গিয়ে লগইন করুন।`)
           setIsLoading(false)
           return
         }
@@ -122,6 +125,7 @@ function LoginView({ onLogin, teacherPassword }) {
         onLogin({ 
           role: profile.role, 
           name: profile.full_name, 
+          permissions: profile.teacher_permissions || {},
           user: authData.user 
         })
       }

@@ -20,6 +20,7 @@ function AttendancePanel({
   onRefreshAttendance,
   onNotify,
   activeBatches = [],
+  canEdit = false,
 }) {
   const getDateRange = (startDate, endDate) => {
     const days = []
@@ -205,13 +206,14 @@ function AttendancePanel({
               type="date"
               value={codeDate}
               onChange={(event) => setCodeDate(event.target.value)}
+              disabled={!canEdit}
               className="block mt-1 px-2 py-2 rounded-xl border border-amber-200 text-xs text-slate-700"
             />
           </label>
           <button
             type="button"
             onClick={() => onRegenerateAttendance?.(codeDate)}
-            disabled={!codeDate}
+            disabled={!canEdit || !codeDate}
             className="px-4 py-2.5 rounded-xl bg-amber-100 text-amber-900 font-bold text-xs flex items-center gap-2 disabled:opacity-50"
           >
             <RefreshCw className="h-4 w-4" /> নতুন কোড
@@ -219,7 +221,8 @@ function AttendancePanel({
           <button
             type="button"
             onClick={() => onToggleAttendance(!attendance.isActive)}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 ${attendance.isActive ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}`}
+            disabled={!canEdit}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 disabled:opacity-50 ${attendance.isActive ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}`}
           >
             <Power className="h-4 w-4" />
             {attendance.isActive ? 'হাজিরা বন্ধ করুন' : 'হাজিরা চালু করুন'}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle2, ChevronLeft, Edit3, Loader2, Save, X, XCircle } from 'lucide-react'
 
-function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }) {
+function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions, canEdit = false }) {
   const [overrideMarks, setOverrideMarks] = useState('')
   const [isIdentityEditing, setIsIdentityEditing] = useState(false)
   const [identityDraft, setIdentityDraft] = useState(() => ({
@@ -69,7 +69,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
         </h3>
 
         <div className="flex items-center gap-2">
-          {isIdentityEditing && (
+          {canEdit && isIdentityEditing && (
             <button
               type="button"
               onClick={cancelIdentityEditing}
@@ -79,7 +79,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
               <X className="h-4 w-4" />
             </button>
           )}
-          <button
+          {canEdit && <button
             type="button"
             onClick={() => {
               if (!isIdentityEditing) setIsIdentityEditing(true)
@@ -88,7 +88,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
           >
             <Edit3 className="h-4 w-4" />
             {isIdentityEditing ? 'এডিটিং চলছে' : 'এডিট করুন'}
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -208,17 +208,18 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
             className="w-24 px-4 py-3 text-center font-bold text-lg bg-slate-50 border border-slate-250 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600"
             value={overrideMarks}
             onChange={(e) => setOverrideMarks(e.target.value)}
+            disabled={!canEdit}
           />
-          <button
+          {canEdit && <button
             type="button"
             onClick={() => setOverrideMarks(autoGradedMarks)}
             className="text-xs font-bold text-[#1B4D1A] hover:underline"
           >
             অটো-গ্রেড সেট করুন
-          </button>
+          </button>}
         </div>
 
-        <button
+        {canEdit && <button
           onClick={() => onSaveMarks(submission.id, overrideMarks, identityDraft)}
           disabled={saving}
           className="w-full md:w-auto px-8 py-3.5 bg-[#1B4D1A] hover:bg-emerald-800 active:bg-emerald-950 text-white font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2 text-sm"
@@ -234,7 +235,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions }
               গ্রেডিং সংরক্ষণ করুন
             </>
           )}
-        </button>
+        </button>}
       </div>
     </div>
   )

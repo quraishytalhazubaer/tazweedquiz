@@ -31,6 +31,10 @@ function TeacherDashboard({
   onGenerateSummaryPDF,
   onGenerateIndividualPDF,
   onManageUsers,
+  canManageExam = false,
+  canViewMarks = false,
+  canEditMarks = false,
+  canGrade = false,
 }) {
   const branches = Array.from(new Set(submissions.map((sub) => sub.userBranch).filter(Boolean)))
 
@@ -41,6 +45,7 @@ function TeacherDashboard({
   const allAvailableBatches = Array.from(
     new Set([...(activeBatches || []), ...submissionBatches].filter((batch) => batch && batch.trim() !== ''))
   )
+  const columnCount = 5 + (canViewMarks ? 5 : 0) + (canViewMarks || canGrade ? 1 : 0)
 
   const filteredSubmissions = submissions.filter((sub) => {
     const query = searchQuery.toLowerCase()
@@ -113,19 +118,19 @@ function TeacherDashboard({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          {canManageExam && <button
             onClick={openConfigSettings}
             className="p-3 bg-slate-50 hover:bg-slate-150 text-slate-700 rounded-2xl border border-slate-200 transition-all flex items-center gap-2 font-bold text-xs"
             title="Settings"
           >
             <Settings className="h-4 w-4" /> Settings
-          </button>
+          </button>}
 
-          <button onClick={onManageUsers} className="p-3 bg-slate-50 hover:bg-slate-150 text-slate-700 rounded-2xl border border-slate-200 transition-all flex items-center gap-2 font-bold text-xs" title="User management">
+          {onManageUsers && <button onClick={onManageUsers} className="p-3 bg-slate-50 hover:bg-slate-150 text-slate-700 rounded-2xl border border-slate-200 transition-all flex items-center gap-2 font-bold text-xs" title="User management">
             <ShieldCheck className="h-4 w-4" /> Users
-          </button>
+          </button>}
 
-          <button
+          {canManageExam && <button
             onClick={() => setIsExamActive(!isExamActive)}
             className={`px-5 py-2.5 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all duration-200 border ${
               isExamActive
@@ -135,7 +140,7 @@ function TeacherDashboard({
           >
             <div className={`w-2.5 h-2.5 rounded-full ${isExamActive ? 'bg-emerald-600 animate-pulse' : 'bg-rose-600'}`}></div>
             {isExamActive ? 'Exam Active (চলমান)' : 'Exam Stopped (বন্ধ)'}
-          </button>
+          </button>}
 
           <button
             onClick={onRefresh}
@@ -205,7 +210,7 @@ function TeacherDashboard({
         </div>
 
         {/* Export Buttons */}
-        <div className="flex gap-2">
+        {canViewMarks && <div className="flex gap-2">
           <button
             onClick={() => onExportExcel(filteredSubmissions, triggerNotification, { batch: selectedReportBatch })}
             className="flex-1 px-3 py-3 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-950 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors"
@@ -218,12 +223,12 @@ function TeacherDashboard({
           >
             <FileText className="h-4 w-4" /> Summary PDF
           </button>
-        </div>
+        </div>}
         </div>
       </div>
 
       {/* Selection Notification Bar */}
-      {selectedIds.length > 0 && (
+      {canViewMarks && selectedIds.length > 0 && (
         <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-4 animate-slide-in">
           <div className="flex items-center gap-2">
             <CheckSquare className="h-5 w-5 text-emerald-800" />
@@ -243,37 +248,39 @@ function TeacherDashboard({
         <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="bg-slate-50 border-b border-slate-150 text-xs font-bold uppercase text-slate-500 tracking-wider">
-                <th className="py-4 px-6 text-center w-12">
+                {canViewMarks && <th className="py-4 px-6 text-center w-12">
                   <input
                     type="checkbox"
                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
                     checked={filteredSubmissions.length > 0 && selectedIds.length === filteredSubmissions.length}
                     onChange={toggleSelectAll}
                   />
-                </th>
+                </th>}
                 <th className="py-4 px-4">আইডি</th>
                 <th className="py-4 px-4">নাম</th>
                 <th className="py-4 px-4">শাখা</th>
                 <th className="py-4 px-4">ব্যাচ</th>
                 <th className="py-4 px-4">জমাদানের সময়</th>
-                <th className="py-4 px-4 text-center">মূল্যায়ন অবস্থা</th>
-                <th className="py-4 px-4 text-center">প্রাপ্ত নম্বর (১০)</th>
-                <th className="py-4 px-4 text-center">ভাইভা (৫)</th>
-                <th className="py-4 px-4 text-center">মোট নম্বর (১৫)</th>
-                <th className="py-4 px-6 text-right">অ্যাকশন</th>
+                {canViewMarks && <>
+                  <th className="py-4 px-4 text-center">মূল্যায়ন অবস্থা</th>
+                  <th className="py-4 px-4 text-center">প্রাপ্ত নম্বর (১০)</th>
+                  <th className="py-4 px-4 text-center">ভাইভা (৫)</th>
+                  <th className="py-4 px-4 text-center">মোট নম্বর (১৫)</th>
+                </>}
+                {(canViewMarks || canGrade) && <th className="py-4 px-6 text-right">অ্যাকশন</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-500 font-medium animate-pulse">
+                  <td colSpan={columnCount} className="py-12 text-center text-slate-500 font-medium animate-pulse">
                     <Loader2 className="h-8 w-8 text-emerald-600 animate-spin mx-auto mb-2" />
                     মূল্যায়ন পত্র লোড করা হচ্ছে...
                   </td>
                 </tr>
               ) : filteredSubmissions.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-500">
+                  <td colSpan={columnCount} className="py-12 text-center text-slate-500">
                     কোনো পরীক্ষার্থীর উত্তরপত্র পাওয়া যায়নি।
                   </td>
                 </tr>
@@ -298,14 +305,14 @@ function TeacherDashboard({
 
                   return (
                     <tr key={sub.id || idx} className={`hover:bg-slate-50/40 transition-colors ${isChecked ? 'bg-emerald-50/20' : ''}`}>
-                      <td className="py-4 px-6 text-center">
+                      {canViewMarks && <td className="py-4 px-6 text-center">
                         <input
                           type="checkbox"
                           className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
                           checked={isChecked}
                           onChange={() => toggleSelectOne(sub.id)}
                         />
-                      </td>
+                      </td>}
                       <td className="py-4 px-4 font-mono text-xs text-slate-600 font-bold">{sub.userId || '---'}</td>
                       <td className="py-4 px-4">
                         <div className="font-bold text-slate-950">{sub.userName}</div>
@@ -315,7 +322,7 @@ function TeacherDashboard({
                       <td className="py-4 px-4 text-xs text-slate-500 font-sans">{sub.timestamp || sub.date || '---'}</td>
                       
                       {/* Evaluation Status Badge */}
-                      <td className="py-4 px-4 text-center">
+                      {canViewMarks && <td className="py-4 px-4 text-center">
                         {isGraded ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
                             Graded
@@ -329,23 +336,23 @@ function TeacherDashboard({
                             Pending
                           </span>
                         )}
-                      </td>
+                      </td>}
                       
                       {/* Written Marks */}
-                      <td className="py-4 px-4 text-center font-black text-base text-[#1B4D1A]">
+                      {canViewMarks && <td className="py-4 px-4 text-center font-black text-base text-[#1B4D1A]">
                         {isEvaluated ? existingMarks : '---'}
-                      </td>
+                      </td>}
 
                       {/* Viva Marks Input - Locked / Read-Only when Graded */}
-                      <td className="py-4 px-4 text-center">
+                      {canViewMarks && <td className="py-4 px-4 text-center">
                         <input
                           type="number"
                           min="0"
                           max="5"
                           step="0.5"
                           value={vivaValue}
-                          disabled={isGraded}
-                          readOnly={isGraded}
+                          disabled={!canEditMarks || isGraded}
+                          readOnly={!canEditMarks || isGraded}
                           onChange={(e) => onUpdateVivaMarks && onUpdateVivaMarks(sub.id, e.target.value)}
                           placeholder="0"
                           className={`w-16 text-center py-1 rounded-lg border font-bold focus:outline-none ${
@@ -354,28 +361,28 @@ function TeacherDashboard({
                               : 'bg-white border-slate-300 text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500'
                           }`}
                         />
-                      </td>
+                      </td>}
 
                       {/* Total Marks */}
-                      <td className="py-4 px-4 text-center font-black text-base text-emerald-800">
+                      {canViewMarks && <td className="py-4 px-4 text-center font-black text-base text-emerald-800">
                         {totalMarks}
-                      </td>
+                      </td>}
 
-                      <td className="py-4 px-6 text-right space-x-2">
-                        <button
+                      {(canViewMarks || canGrade) && <td className="py-4 px-6 text-right space-x-2">
+                        {canViewMarks && <button
                           onClick={() => onGenerateIndividualPDF([sub], triggerNotification, { batch: selectedReportBatch })}
                           className="p-2 text-slate-400 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition inline-flex items-center"
                           title="পিডিএফ ডাউনলোড"
                         >
                           <FileText className="h-4.5 w-4.5" />
-                        </button>
-                        <button
+                        </button>}
+                        {canGrade && <button
                           onClick={() => onGrade(sub)}
                           className="px-4 py-1.5 bg-green-900 hover:bg-green-500 active:bg-black text-white hover:text-black font-bold rounded-xl text-xs transition inline-flex items-center"
                         >
                           Check
-                        </button>
-                      </td>
+                        </button>}
+                      </td>}
                     </tr>
                   )
                 })

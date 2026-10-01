@@ -9,7 +9,8 @@ export default function SettingsModal({
   currentAllBatches = [],
   submissions = [],
   triggerNotification,
-  onToggleAllGraded
+  onToggleAllGraded,
+  canToggleAllGraded = false,
 }) {
   const [activeBatches, setActiveBatches] = useState([]);
   const [allBatches, setAllBatches] = useState([]); // Fixed: Defined setAllBatches state
@@ -120,7 +121,7 @@ export default function SettingsModal({
         </div>
 
         {/* Status Toggle Row */}
-        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+        {canToggleAllGraded && <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
           <div>
             <p className="font-bold text-sm text-slate-800">
               সকল রেজাল্ট {isAllGraded ? 'Graded' : 'Evaluated'} অবস্থায় আছে
@@ -147,7 +148,7 @@ export default function SettingsModal({
               }`}
             />
           </button>
-        </div>
+        </div>}
 
         {/* Active Batches Selection Panel */}
         <div className="space-y-3">

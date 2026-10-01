@@ -7,10 +7,10 @@ const navigationItems = [
   { id: 'users', label: 'User Management', icon: Users },
 ]
 
-function TeacherNavigation({ activePage, onPageChange }) {
+function TeacherNavigation({ activePage, onPageChange, pages = navigationItems.map(({ id }) => id) }) {
   return (
     <nav className="mb-8 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm" aria-label="Teacher pages">
-      {navigationItems.map(({ id, label, icon: Icon }) => (
+      {navigationItems.filter(({ id }) => pages.includes(id)).map(({ id, label, icon: Icon }) => (
         <button
           key={id}
           type="button"

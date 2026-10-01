@@ -26,22 +26,29 @@ Deno.serve(async (request) => {
     if (authError || !authData.user) return json({ error: 'Invalid session.' }, 401)
 
     const { data: requester, error: requesterError } = await adminClient
-      .from('profiles').select('role').eq('id', authData.user.id).single()
-    if (requesterError || requester?.role !== 'teacher') return json({ error: 'Admin access required.' }, 403)
-
+      .from('profiles').select('role, teacher_permissions, approved').eq('id', authData.user.id).single()
+    if (requesterError || !requester?.approved) return json({ error: 'Admin access required.' }, 403)
     const payload = await request.json()
+    const isAdmin = requester.role === 'admin'
+    const canEditGrades = requester.role === 'teacher'
+      && requester.teacher_permissions?.grading?.edit === true
+    if (!isAdmin && !(payload.action === 'update-employee-id' && canEditGrades)) {
+      return json({ error: 'Admin access required.' }, 403)
+    }
+
     if (payload.action === 'list') {
       const { data, error } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 })
       if (error) return json({ error: error.message }, 400)
 
       const userIds = data.users.map((user) => user.id)
-      const { data: profiles } = await adminClient.from('profiles').select('id, role, full_name, employee_id, branch, designation, approved, batch').in('id', userIds)
+      const { data: profiles } = await adminClient.from('profiles').select('id, role, teacher_permissions, full_name, employee_id, branch, designation, approved, batch').in('id', userIds)
       const profileById = new Map((profiles || []).map((profile) => [profile.id, profile]))
       return json({ users: data.users.map((user) => ({
         id: user.id,
         email: user.email,
         created_at: user.created_at,
         role: profileById.get(user.id)?.role || 'unknown',
+        permissions: profileById.get(user.id)?.teacher_permissions || {},
         full_name: profileById.get(user.id)?.full_name || user.user_metadata?.full_name || '',
         employee_id: profileById.get(user.id)?.employee_id || '',
         branch: profileById.get(user.id)?.branch || '',
@@ -71,6 +78,44 @@ Deno.serve(async (request) => {
         .eq('id', payload.userId)
       if (error) return json({ error: error.message }, 400)
       return json({ success: true, employeeId })
+    }
+
+    if (payload.action === 'update-teacher-access') {
+      if (typeof payload.userId !== 'string' || !['teacher', 'admin'].includes(payload.role)) {
+        return json({ error: 'A valid staff user and role are required.' }, 400)
+      }
+
+      const featureKeys = ['attendance', 'materials', 'exam', 'marks', 'grading']
+      const permissions = Object.fromEntries(featureKeys.map((key) => {
+        const grant = payload.permissions?.[key] || {}
+        const edit = grant.edit === true
+        return [key, { view: grant.view === true || edit, edit }]
+      }))
+      if (permissions.grading.edit) permissions.marks.view = true
+      const targetRole = payload.role
+
+      const { data: target, error: targetError } = await adminClient
+        .from('profiles').select('role').eq('id', payload.userId).single()
+      if (targetError || !['teacher', 'admin'].includes(target?.role)) {
+        return json({ error: 'Permissions can only be assigned to staff accounts.' }, 400)
+      }
+
+      if (target.role === 'admin' && targetRole !== 'admin') {
+        const { data: admins, error: adminsError } = await adminClient
+          .from('profiles').select('id').eq('role', 'admin')
+        if (adminsError) return json({ error: adminsError.message }, 400)
+        if ((admins || []).length <= 1) return json({ error: 'At least one admin account must remain.' }, 400)
+      }
+
+      const savedPermissions = targetRole === 'admin'
+        ? Object.fromEntries(featureKeys.map((key) => [key, { view: true, edit: true }]))
+        : permissions
+      const { error } = await adminClient.from('profiles').update({
+        role: targetRole,
+        teacher_permissions: savedPermissions,
+      }).eq('id', payload.userId)
+      if (error) return json({ error: error.message }, 400)
+      return json({ success: true, role: targetRole, permissions: savedPermissions })
     }
 
     if (payload.action === 'approve-users') {

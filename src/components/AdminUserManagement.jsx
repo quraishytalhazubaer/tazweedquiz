@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import { normalizeTeacherPermissions, TEACHER_FEATURES } from "../constants/teacherPermissions";
 
 function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBatchStatus }) {
   const [users, setUsers] = useState([]);
@@ -32,6 +33,8 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
   const [expandedBatches, setExpandedBatches] = useState({});
   const [selectedUser, setSelectedUser] = useState(null);
   const [employeeIdDraft, setEmployeeIdDraft] = useState("");
+  const [accessRole, setAccessRole] = useState("teacher");
+  const [accessPermissions, setAccessPermissions] = useState({});
 
   const loadUsers = async () => {
     setLoading(true);
@@ -58,6 +61,32 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
   const openUser = (user) => {
     setSelectedUser(user);
     setEmployeeIdDraft(user.employee_id || "");
+    setAccessRole(user.role);
+    setAccessPermissions(normalizeTeacherPermissions(user.permissions));
+  };
+
+  const saveStaffAccess = async () => {
+    setWorking(true);
+    const { data, error } = await supabase.functions.invoke(
+      "admin-user-management",
+      { body: {
+        action: "update-teacher-access",
+        userId: selectedUser.id,
+        role: accessRole,
+        permissions: accessPermissions,
+      } },
+    );
+    if (error || data?.error) {
+      onNotify(`Role বা access পরিবর্তন করা যায়নি: ${error?.message || data.error}`, "error");
+    } else {
+      const updatedUser = { ...selectedUser, role: data.role, permissions: data.permissions };
+      setUsers((current) => current.map((user) => user.id === updatedUser.id ? updatedUser : user));
+      setSelectedUser(updatedUser);
+      setAccessRole(data.role);
+      setAccessPermissions(normalizeTeacherPermissions(data.permissions));
+      onNotify("Staff role ও feature access সংরক্ষণ করা হয়েছে।", "success");
+    }
+    setWorking(false);
   };
 
   const changeEmployeeId = async () => {
@@ -304,7 +333,9 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
   };
 
   const renderRole = (role, title) => {
-    const roleUsers = visibleUsers.filter((user) => user.role === role);
+    const roleUsers = visibleUsers.filter((user) => role === "staff"
+      ? ["teacher", "admin"].includes(user.role)
+      : user.role === role);
     const approvedUsers = roleUsers.filter((user) => user.approved);
     const pendingUsers = roleUsers.filter((user) => !user.approved);
     const pendingIds = pendingUsers.map((user) => user.id);
@@ -634,7 +665,7 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
         <p className="text-sm text-slate-500">User list লোড হচ্ছে...</p>
       ) : (
         <div className="space-y-8">
-          {renderRole("teacher", "Teachers")}
+          {renderRole("staff", "Teachers & admins")}
           {renderRole("student", "Students")}
         </div>
       )}
@@ -656,7 +687,7 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
               </button>
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-slate-50 p-3">
+              {selectedUser.role === "student" && <div className="rounded-2xl bg-slate-50 p-3">
                 <label htmlFor="student-id" className="text-xs font-bold uppercase tracking-wide text-slate-400">Student ID</label>
                 <div className="mt-2 flex gap-2">
                   <input
@@ -675,9 +706,10 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
                     Save
                   </button>
                 </div>
-              </div>
+              </div>}
               <div className={`rounded-2xl p-3 ${selectedUser.approved ? "bg-emerald-50" : "bg-amber-50"}`}><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Status</p><p className="mt-1 text-sm font-black text-slate-800">{selectedUser.approved ? "Approved" : "Pending"}</p></div>
             </div>
+            {selectedUser.role === "student" && <>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Branch</p><p className="mt-1 text-sm font-black text-slate-800">{selectedUser.branch || "—"}</p></div>
               <div className="rounded-2xl bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Designation</p><p className="mt-1 text-sm font-black text-slate-800">{selectedUser.designation || "—"}</p></div>
@@ -688,6 +720,67 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
                 {(Array.isArray(selectedUser.batch) ? selectedUser.batch : selectedUser.batch ? [selectedUser.batch] : []).length ? (Array.isArray(selectedUser.batch) ? selectedUser.batch : [selectedUser.batch]).map((batch) => <span key={batch} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200">{batch}</span>) : <span className="text-sm text-slate-500">Unassigned</span>}
               </div>
             </div>
+            </>}
+            {["teacher", "admin"].includes(selectedUser.role) && (
+              <div className="mt-4 rounded-2xl border border-slate-200 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900">Staff role & access</h4>
+                    <p className="mt-1 text-xs text-slate-500">Edit access also enables viewing.</p>
+                  </div>
+                  <select
+                    value={accessRole}
+                    onChange={(event) => setAccessRole(event.target.value)}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold"
+                    aria-label="Staff role"
+                  >
+                    <option value="teacher">Teacher</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                {accessRole === "teacher" && (
+                  <div className="mt-4 divide-y divide-slate-100">
+                    {TEACHER_FEATURES.map(({ key, label }) => (
+                      <div key={key} className="flex items-center justify-between gap-3 py-2.5">
+                        <span className="text-sm font-semibold text-slate-700">{label}</span>
+                        <div className="flex gap-4 text-xs font-semibold text-slate-600">
+                          {["view", "edit"].map((action) => (
+                            <label key={action} className="flex items-center gap-1.5 capitalize">
+                              <input
+                                type="checkbox"
+                                checked={accessPermissions[key]?.[action] === true}
+                                onChange={(event) => setAccessPermissions((current) => {
+                                  const grant = { ...current[key], [action]: event.target.checked };
+                                  if (action === "edit" && event.target.checked) grant.view = true;
+                                  if (key === "grading" && action === "edit" && event.target.checked) {
+                                    return { ...current, [key]: grant, marks: { ...current.marks, view: true } };
+                                  }
+                                  if (key === "marks" && action === "view" && !event.target.checked && current.grading?.edit) {
+                                    grant.view = true;
+                                  }
+                                  return { ...current, [key]: grant };
+                                })}
+                                className="h-4 w-4 accent-emerald-700"
+                              />
+                              {action}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {accessRole === "admin" && <p className="mt-3 text-xs text-emerald-800">Admins have full access to all five features.</p>}
+                <button
+                  type="button"
+                  onClick={saveStaffAccess}
+                  disabled={working}
+                  className="mt-4 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                >
+                  Save role & access
+                </button>
+              </div>
+            )}
             <p className="mt-4 text-xs text-slate-400">Created: {selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleString() : "Unknown"}</p>
           </div>
         </div>,
