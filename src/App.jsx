@@ -14,7 +14,6 @@ import AdminUserManagement from './components/AdminUserManagement';
 import TeacherDashboardComponent from './components/TeacherDashboard';
 import GradingWorkspaceComponent from './components/GradingWorkspace';
 import ConfigModal from './components/SettingsModal';
-import QUESTIONS from './constants/mcqquestions';
 import { handleExportExcel, generateSummaryPDF, generateIndividualPDF } from './utils/reports';
 import { hasTeacherPermission } from './constants/teacherPermissions';
 
@@ -60,15 +59,17 @@ const generateAttendanceCode = (attendanceDate = getLocalDateKey()) => {
 // ============================================================================
 // 2. APP HELPERS
 // ============================================================================
-const calculateAutoScore = (answers) => {
+const calculateAutoScore = (answers, questions) => {
+  if (!questions.length) return 0;
+  const marksPerQuestion = 10 / questions.length;
   let score = 0;
-  QUESTIONS.forEach((q, idx) => {
+  questions.forEach((q, idx) => {
     const studentAns = answers[`q${idx + 1}`];
     if (studentAns) {
       const correctNorm = q.correctAnswer.replace(/\s+/g, ' ').trim();
       const studentNorm = studentAns.replace(/\s+/g, ' ').trim();
       if (correctNorm === studentNorm) {
-        score += 0.5; // Total max score = 100 marks (20 Qs * 5)
+        score += marksPerQuestion;
       }
     }
   });
@@ -81,6 +82,9 @@ const calculateAutoScore = (answers) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [questions, setQuestions] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(true);
+  const [questionLoadError, setQuestionLoadError] = useState('');
   const [isExamActive, setIsExamActive] = useState(true);
   const [attendance, setAttendance] = useState({ isActive: false, code: '', date: '', generatedAt: null });
   const [activeBatches, setActiveBatches] = useState([]);
@@ -101,7 +105,6 @@ export default function App() {
     userBranch: '',
     designation: '',
     batch: '',
-    ...Array.from({ length: 20 }).reduce((acc, _, i) => ({ ...acc, [`q${i + 1}`]: '' }), {})
   });
 
   const [submitStatus, setSubmitStatus] = useState(null);
@@ -148,6 +151,45 @@ export default function App() {
       setNotification(null);
     }, 4500);
   };
+
+  async function fetchQuestions() {
+    setQuestionsLoading(true);
+    setQuestionLoadError('');
+    try {
+      const { data, error } = await supabase
+        .from('mcq_questions')
+        .select('id, question, options, correct_answer')
+        .order('id', { ascending: true });
+      if (error) throw error;
+
+      const loadedQuestions = (data || []).map((row) => ({
+        id: row.id,
+        question: row.question,
+        options: Array.isArray(row.options) ? row.options : Object.values(row.options || {}),
+        correctAnswer: row.correct_answer,
+      }));
+
+      if (!loadedQuestions.length || loadedQuestions.some((question) => (
+        typeof question.question !== 'string'
+        || !Array.isArray(question.options)
+        || !question.options.length
+        || typeof question.correctAnswer !== 'string'
+      ))) {
+        throw new Error('প্রশ্নের তালিকা খালি অথবা ডাটাবেজের তথ্য সঠিক নয়।');
+      }
+      setQuestions(loadedQuestions);
+    } catch (error) {
+      console.error('Failed to load MCQ questions:', error);
+      setQuestionLoadError(error?.message || 'প্রশ্ন লোড করা যায়নি।');
+      setQuestions([]);
+    } finally {
+      setQuestionsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchQuestions();
+  }, []);
 
   const fetchStudentAttendance = async (profileId) => {
     if (!profileId) return;
@@ -428,7 +470,7 @@ export default function App() {
       const submissionColumns = [
         'id, profile_id, user_name, user_id, user_branch, designation, batch, date, timestamp',
         ...(hasTeacherPermission(user, 'marks') ? ['status, marks, viva_marks, total_marks'] : []),
-        ...(hasTeacherPermission(user, 'grading') ? ['answers'] : []),
+        ...(hasTeacherPermission(user, 'grading') || hasTeacherPermission(user, 'marks') ? ['answers'] : []),
         'profile:profiles(full_name, employee_id, branch, designation, batch)',
       ].join(', ');
       const { data, error } = await supabase
@@ -571,7 +613,7 @@ export default function App() {
       return;
     }
 
-    const answersProvided = Array.from({ length: 20 }).some((_, i) => formData[`q${i + 1}`]);
+    const answersProvided = questions.length > 0 && questions.every((_, index) => formData[`q${index + 1}`]);
     if (!answersProvided) {
       triggerNotification("দয়া করে অন্তত কিছু প্রশ্নের উত্তর নির্বাচন করুন।", "error");
       return;
@@ -614,13 +656,17 @@ export default function App() {
         return;
       }
 
-      const score = calculateAutoScore(formData);
+      const score = calculateAutoScore(formData, questions);
       
       // Isolate procedural questions choices out from layout identification payloads
       const answersPayload = {};
-      Array.from({ length: 20 }).forEach((_, i) => {
+      questions.forEach((question, i) => {
         const key = `q${i + 1}`;
-        answersPayload[key] = formData[key] || '';
+        const answer = formData[key] || '';
+        answersPayload[key] = answer;
+        answersPayload[`question_${question.id}`] = answer;
+        answersPayload[`question_${question.id}_text`] = question.question;
+        answersPayload[`question_${question.id}_correct`] = question.correctAnswer;
       });
 
       const profileBatches = Array.from(new Set([
@@ -961,7 +1007,6 @@ export default function App() {
       userName: '',
       userId: '',
       userBranch: '',
-      ...Array.from({ length: 20 }).reduce((acc, _, i) => ({ ...acc, [`q${i + 1}`]: '' }), {})
     });
     triggerNotification("সফলভাবে লগআউট করা হয়েছে।");
   };
@@ -1050,7 +1095,7 @@ export default function App() {
               onBack={() => setGradingSubmission(null)} 
               onSaveMarks={handleUpdateMarks}
               saving={savingMarks}
-              questions={QUESTIONS}
+              questions={questions}
               canEdit={hasTeacherPermission(user, 'grading', 'edit')}
             />
           ) : (
@@ -1111,6 +1156,8 @@ export default function App() {
               canViewMarks={hasTeacherPermission(user, 'marks')}
               canEditMarks={hasTeacherPermission(user, 'marks', 'edit')}
               canGrade={hasTeacherPermission(user, 'grading')}
+              questions={questions}
+              onQuestionsChange={setQuestions}
             />
             {/* Settings Configuration Modal */}
               {hasTeacherPermission(user, 'exam', 'edit') && <ConfigModal
@@ -1150,10 +1197,14 @@ export default function App() {
                 gradedMarks={studentSubmission?.status?.toLowerCase() === 'graded' ? studentSubmission.marks : null}
                 isExamActive={isExamActive}
                 activeBatches={activeBatches}
-                isSheetyReachable={isDatabaseReachable}
-                checkingConnection={checkingConnection}
-                onRetryConnection={checkDatabaseReachability}
-                questions={QUESTIONS}
+                isSheetyReachable={isDatabaseReachable !== false && !questionLoadError}
+                checkingConnection={checkingConnection || questionsLoading}
+                onRetryConnection={() => {
+                  checkDatabaseReachability();
+                  fetchQuestions();
+                }}
+                connectionErrorMessage={questionLoadError}
+                questions={questions}
               />
             }
           />

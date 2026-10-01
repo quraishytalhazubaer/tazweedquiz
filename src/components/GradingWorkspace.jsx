@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle2, ChevronLeft, Edit3, Loader2, Save, X, XCircle } from 'lucide-react'
+import { getQuestionAnswer, getQuestionCorrectAnswer, getQuestionText } from '../utils/questionAnswers'
 
 function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions, canEdit = false }) {
   const [overrideMarks, setOverrideMarks] = useState('')
@@ -41,15 +42,17 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions, 
   }
 
   let autoGradedMarks = 0
+  const marksPerQuestion = questions.length ? 10 / questions.length : 0
   const matchDetails = questions.map((q, i) => {
-    const studentAns = submission[`q${i + 1}`] || ''
-    const isCorrect = studentAns.trim() === q.correctAnswer.trim()
-    if (isCorrect) autoGradedMarks += 0.5
+    const studentAns = getQuestionAnswer(submission, q, i)
+    const correctAnswer = getQuestionCorrectAnswer(submission, q)
+    const isCorrect = studentAns.trim() === correctAnswer.trim()
+    if (isCorrect) autoGradedMarks += marksPerQuestion
     return {
       num: i + 1,
-      question: q.question,
+      question: getQuestionText(submission, q),
       studentAns,
-      correctAnswer: q.correctAnswer,
+      correctAnswer,
       isCorrect,
     }
   })

@@ -1,5 +1,7 @@
-import { CheckSquare, Download, FileText, Loader2, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
+import { CheckSquare, Download, FileText, Loader2, Plus, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
 import AttendancePanel from './AttendancePanel'
+import QuestionManagement from './QuestionManagement'
 
 function TeacherDashboard({
   submissions = [],
@@ -35,7 +37,10 @@ function TeacherDashboard({
   canViewMarks = false,
   canEditMarks = false,
   canGrade = false,
+  questions = [],
+  onQuestionsChange,
 }) {
+  const [questionManagerOpen, setQuestionManagerOpen] = useState(false)
   const branches = Array.from(new Set(submissions.map((sub) => sub.userBranch).filter(Boolean)))
 
   const submissionBatches = Array.from(
@@ -102,10 +107,19 @@ function TeacherDashboard({
       triggerNotification('দয়া করে যেকোনো শিক্ষার্থী সিলেক্ট করুন।', 'error')
       return
     }
-    onGenerateIndividualPDF(selectedData, triggerNotification, { batch: selectedReportBatch })
+    onGenerateIndividualPDF(selectedData, triggerNotification, questions)
   }
 
   return (
+    <>
+    {questionManagerOpen ? (
+      <QuestionManagement
+        questions={questions}
+        onQuestionsChange={onQuestionsChange}
+        onNotify={triggerNotification}
+        onClose={() => setQuestionManagerOpen(false)}
+      />
+    ) : (
     <div className="space-y-6 animate-slide-in">
       {/* Top Header Controls */}
       <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-slate-200/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -124,6 +138,15 @@ function TeacherDashboard({
             title="Settings"
           >
             <Settings className="h-4 w-4" /> Settings
+          </button>}
+
+          {canManageExam && <button
+            type="button"
+            onClick={() => setQuestionManagerOpen(true)}
+            className="p-3 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-2xl border border-emerald-200 transition-all flex items-center gap-2 font-bold text-xs"
+            title="Manage exam questions"
+          >
+            <Plus className="h-4 w-4" /> Questions
           </button>}
 
           {onManageUsers && <button onClick={onManageUsers} className="p-3 bg-slate-50 hover:bg-slate-150 text-slate-700 rounded-2xl border border-slate-200 transition-all flex items-center gap-2 font-bold text-xs" title="User management">
@@ -212,7 +235,7 @@ function TeacherDashboard({
         {/* Export Buttons */}
         {canViewMarks && <div className="flex gap-2">
           <button
-            onClick={() => onExportExcel(filteredSubmissions, triggerNotification, { batch: selectedReportBatch })}
+            onClick={() => onExportExcel(filteredSubmissions, triggerNotification, questions)}
             className="flex-1 px-3 py-3 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-950 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors"
           >
             <Download className="h-4 w-4" /> Export CSV
@@ -370,7 +393,7 @@ function TeacherDashboard({
 
                       {(canViewMarks || canGrade) && <td className="py-4 px-6 text-right space-x-2">
                         {canViewMarks && <button
-                          onClick={() => onGenerateIndividualPDF([sub], triggerNotification, { batch: selectedReportBatch })}
+                          onClick={() => onGenerateIndividualPDF([sub], triggerNotification, questions)}
                           className="p-2 text-slate-400 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition inline-flex items-center"
                           title="পিডিএফ ডাউনলোড"
                         >
@@ -391,6 +414,8 @@ function TeacherDashboard({
         </table>
       </div>
     </div>
+    )}
+    </>
   )
 }
 

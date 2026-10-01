@@ -1,4 +1,4 @@
-import QUESTIONS from '../constants/mcqquestions';
+import { getQuestionAnswer, getQuestionCorrectAnswer, getQuestionText } from './questionAnswers'
 
 // --- 1. Comprehensive Script Loader (Exposes all global namespaces cleanly) ---
 const loadAllPdfLibraries = () => {
@@ -39,13 +39,13 @@ const loadAllPdfLibraries = () => {
 };
 
 // --- Excel / CSV Export (Unchanged & Working) ---
-export const handleExportExcel = (submissions, notify) => {
+export const handleExportExcel = (submissions, notify, questions = []) => {
   if (!submissions || submissions.length === 0) {
     notify('ডাউনলোড করার মতো কোনো তথ্য নেই।', 'error');
     return;
   }
 
-  const headers = ['Name', 'EMP. ID', 'Branch', 'Date', 'Marks', ...Array.from({ length: 20 }, (_, i) => `Q${i + 1}`)];
+  const headers = ['Name', 'EMP. ID', 'Branch', 'Date', 'Marks', ...questions.map((_, index) => `Q${index + 1}`)];
   const csvRows = [headers.join(',')];
 
   submissions.forEach((sub) => {
@@ -55,7 +55,7 @@ export const handleExportExcel = (submissions, notify) => {
       sub.userBranch || '',
       sub.date || '',
       sub.marks !== undefined ? sub.marks : 0,
-      ...Array.from({ length: 20 }, (_, i) => sub[`q${i + 1}`] || '')
+      ...questions.map((question, index) => getQuestionAnswer(sub, question, index))
     ].map((field) => `"${(field ?? '').toString().replace(/"/g, '""')}"`);
 
     csvRows.push(row.join(','));
@@ -172,7 +172,7 @@ export const generateSummaryPDF = async (submissions, notify) => {
   }
 };
 
-export const generateIndividualPDF = async (dataArray, notify) => {
+export const generateIndividualPDF = async (dataArray, notify, questions = []) => {
   if (!dataArray || dataArray.length === 0) {
     notify("ডাউনলোড করার মতো কোনো তথ্য নেই।", "error");
     return;
@@ -217,15 +217,17 @@ export const generateIndividualPDF = async (dataArray, notify) => {
             <h3 style="font-size: 12px; color: #1B4D1A; margin: 0 0 10px 0; padding-bottom: 4px; border-bottom: 2px solid #e5e7eb; text-transform: uppercase; font-weight: bold;">Detailed Question Response Sheet</h3>
             
             <div style="margin-top: 5px;">
-                ${QUESTIONS.map((q, i) => {
-                  const studentAnswer = sub['q' + (i + 1)];
-                  const isCorrect = studentAnswer && studentAnswer.trim() === q.correctAnswer.trim();
+                ${questions.map((q, i) => {
+                  const studentAnswer = getQuestionAnswer(sub, q, i);
+                  const correctAnswer = getQuestionCorrectAnswer(sub, q);
+                  const questionText = getQuestionText(sub, q);
+                  const isCorrect = studentAnswer && studentAnswer.trim() === correctAnswer.trim();
                   return `
                     <div style="margin-bottom: 8px; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px; font-size: 10px; line-height: 1.4;">
-                        <p style="font-weight: bold; color: #374151; margin: 0 0 3px 0;">Q${i+1}: ${q.question}</p>
+                        <p style="font-weight: bold; color: #374151; margin: 0 0 3px 0;">Q${i+1}: ${questionText}</p>
                         <div style="display: block; padding: 5px; border-radius: 4px; background: ${isCorrect ? '#f0fdf4' : '#fef2f2'}; border-left: 3px solid ${isCorrect ? '#10b981' : '#ef4444'}; box-sizing: border-box;">
                             <p style="margin: 0; color: #1f2937;"><strong>Given Choice:</strong> ${studentAnswer || '<span style="color:#ef4444; font-weight: bold;">No response recorded</span>'}</p>
-                            ${!isCorrect ? `<p style="margin: 1px 0 0 0; color: #1B4D1A;"><strong>Expected Key:</strong> ${q.correctAnswer}</p>` : ''}
+                            ${!isCorrect ? `<p style="margin: 1px 0 0 0; color: #1B4D1A;"><strong>Expected Key:</strong> ${correctAnswer}</p>` : ''}
                         </div>
                     </div>
                   `;

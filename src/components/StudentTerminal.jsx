@@ -10,6 +10,7 @@ function StudentTerminal({
   isSheetyReachable,
   checkingConnection,
   onRetryConnection,
+  connectionErrorMessage = '',
   questions,
   activeBatches = [], // <-- Pass activeBatches prop with fallback
 }) {
@@ -33,7 +34,7 @@ function StudentTerminal({
         </div>
         <h3 className="text-xl font-black text-slate-900">সার্ভার সংযোগ ত্রুটি</h3>
         <p className="text-sm text-slate-600 mt-3 leading-relaxed">
-          পরীক্ষার মূল ডেটাবেজ সার্ভারটি বর্তমানে অফলাইন অথবা সাময়িকভাবে আপনার ডিভাইস থেকে অ্যাক্সেস করা যাচ্ছে না। সংযোগ বিঘ্নিত থাকায় প্রশ্নপত্র প্রদর্শন বন্ধ রয়েছে।
+          {connectionErrorMessage || 'পরীক্ষার মূল ডেটাবেজ সার্ভারটি বর্তমানে অফলাইন অথবা সাময়িকভাবে আপনার ডিভাইস থেকে অ্যাক্সেস করা যাচ্ছে না। সংযোগ বিঘ্নিত থাকায় প্রশ্নপত্র প্রদর্শন বন্ধ রয়েছে।'}
         </p>
         <div className="mt-8 space-y-3">
           <button
