@@ -286,6 +286,8 @@ export default function App() {
           triggerNotification(
             data.reason === 'missing-session-id'
               ? 'আপনার session বৈধ নয়। আবার login করুন।'
+              : data.reason === 'missing-session'
+                ? 'আপনার session database-এ নেই। আবার login করুন।'
               : 'আপনার সেশনটি Admin বন্ধ করেছেন।',
             'error'
           );

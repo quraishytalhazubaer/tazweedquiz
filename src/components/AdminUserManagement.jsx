@@ -22,6 +22,18 @@ import {
 import { supabase } from "../supabaseClient";
 import { normalizeTeacherPermissions, TEACHER_FEATURES } from "../constants/teacherPermissions";
 
+const getFunctionErrorMessage = async (error) => {
+  if (error?.context && typeof error.context.clone === "function") {
+    try {
+      const body = await error.context.clone().json();
+      if (body?.error) return body.error;
+    } catch (responseError) {
+      console.error("Could not read the user-management error response:", responseError);
+    }
+  }
+  return error?.message || "Unknown function error.";
+};
+
 function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = [], onToggleBatchStatus }) {
   const [users, setUsers] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -39,20 +51,26 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
 
   const loadUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke(
-      "admin-user-management",
-      { body: { action: "list" } },
-    );
-    if (error || data?.error)
-      onNotify(
-        `ব্যবহারকারীদের তালিকা লোড করা যায়নি: ${error?.message || data.error}`,
-        "error",
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "admin-user-management",
+        { body: { action: "list" } },
       );
-    else {
-      setUsers(data.users || []);
-      setSelectedIds([]);
+      if (error || data?.error) {
+        const message = error
+          ? await getFunctionErrorMessage(error)
+          : data.error;
+        onNotify(`ব্যবহারকারীদের তালিকা লোড করা যায়নি: ${message}`, "error");
+      } else {
+        setUsers(data.users || []);
+        setSelectedIds([]);
+      }
+    } catch (error) {
+      console.error("Failed to load users:", error);
+      onNotify(`ব্যবহারকারীদের তালিকা লোড করা যায়নি: ${error.message || "Unknown error."}`, "error");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {

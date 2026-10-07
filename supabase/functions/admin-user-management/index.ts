@@ -64,6 +64,54 @@ Deno.serve(async (request) => {
     const sessionClaims = getSessionClaims(accessToken)
     const sessionId = sessionClaims?.sessionId
 
+    if (payload.action === 'register-session') {
+      if (!sessionId) return json({ error: 'Session ID is not available.' }, 400)
+      const { data: profile, error: profileError } = await adminClient
+        .from('profiles')
+        .select('role, approved, archived')
+        .eq('id', authData.user.id)
+        .single()
+      if (profileError) return json({ error: `Could not verify the account profile: ${profileError.message}` }, 500)
+      if (!profile?.approved) return json({ error: 'This account is not approved.' }, 403)
+      if (profile.archived && profile.role !== 'student') return json({ error: 'This account has been archived.' }, 403)
+
+      const { data: existingSession, error: existingSessionError } = await adminClient
+        .from('user_sessions')
+        .select('revoked_at')
+        .eq('session_id', sessionId)
+        .eq('user_id', authData.user.id)
+        .maybeSingle()
+      if (existingSessionError) return json({ error: `Could not check the session record: ${existingSessionError.message}` }, 500)
+      if (existingSession?.revoked_at) return json({ revoked: true })
+
+      const sessionRecord = {
+        session_id: sessionId,
+        user_id: authData.user.id,
+        ip_address: getClientIp(request),
+        last_seen_at: new Date().toISOString(),
+      }
+      const writeResult = existingSession
+        ? await adminClient
+          .from('user_sessions')
+          .update({
+            last_seen_at: sessionRecord.last_seen_at,
+            ...(sessionRecord.ip_address ? { ip_address: sessionRecord.ip_address } : {}),
+          })
+          .eq('session_id', sessionId)
+          .eq('user_id', authData.user.id)
+          .is('revoked_at', null)
+          .select('session_id')
+          .maybeSingle()
+        : await adminClient
+          .from('user_sessions')
+          .insert(sessionRecord)
+          .select('session_id')
+          .single()
+      if (writeResult.error) return json({ error: `Could not register the session: ${writeResult.error.message}` }, 500)
+      if (!writeResult.data) return json({ revoked: true })
+      return json({ success: true })
+    }
+
     if (payload.action === 'logout-other-sessions') {
       if (!sessionId) return json({ error: 'Session ID is not available.' }, 400)
       const revokedAt = new Date().toISOString()
@@ -112,12 +160,13 @@ Deno.serve(async (request) => {
       if (sessionError) {
         return json({ error: `Could not check whether this session was revoked: ${sessionError.message}` }, 500)
       }
+      if (!trackedSession) return json({ revoked: true, reason: 'missing-session' })
       if (trackedSession?.revoked_at) return json({ revoked: true })
     }
 
     const { data: requester, error: requesterError } = await adminClient
       .from('profiles')
-      .select('role, teacher_permissions, approved, archived, other_sessions_revoked_at, other_sessions_exempt_session_id')
+      .select('role, teacher_permissions, approved, archived')
       .eq('id', authData.user.id)
       .single()
     if (requesterError) {
@@ -130,13 +179,22 @@ Deno.serve(async (request) => {
         ? json({ revoked: true })
         : json({ error: 'Admin access required.' }, 403)
     }
-    if (
-      payload.action === 'track-session'
-      && requester.other_sessions_revoked_at
-      && requester.other_sessions_exempt_session_id !== sessionId
-      && sessionClaims?.issuedAt <= new Date(requester.other_sessions_revoked_at).getTime()
-    ) {
-      return json({ revoked: true })
+    if (payload.action === 'track-session') {
+      const { data: revocationMarker, error: markerError } = await adminClient
+        .from('profiles')
+        .select('other_sessions_revoked_at, other_sessions_exempt_session_id')
+        .eq('id', authData.user.id)
+        .single()
+      if (markerError) {
+        return json({ error: `Could not read the session revocation marker. Apply migration 202610070002_session_revocation_marker.sql: ${markerError.message}` }, 500)
+      }
+      if (
+        revocationMarker.other_sessions_revoked_at
+        && revocationMarker.other_sessions_exempt_session_id !== sessionId
+        && sessionClaims?.issuedAt <= new Date(revocationMarker.other_sessions_revoked_at).getTime()
+      ) {
+        return json({ revoked: true })
+      }
     }
     if (requester.archived && requester.role !== 'student' && payload.action !== 'track-session') {
       return json({ error: 'This account has been archived.' }, 403)
@@ -159,8 +217,8 @@ Deno.serve(async (request) => {
         ip_address: getClientIp(request),
         last_seen_at: new Date().toISOString(),
       }
-      const trackingWrite = trackedSession
-        ? await adminClient
+      if (!trackedSession) return json({ revoked: true, reason: 'missing-session' })
+      const trackingWrite = await adminClient
           .from('user_sessions')
           .update({
             last_seen_at: sessionUpdate.last_seen_at,
@@ -171,38 +229,9 @@ Deno.serve(async (request) => {
           .is('revoked_at', null)
           .select('session_id, user_id')
           .maybeSingle()
-        : await adminClient
-          .from('user_sessions')
-          .insert(sessionUpdate)
-          .select('session_id, user_id')
-          .single()
-      if (trackingWrite.error?.code === '23505' && !trackedSession) {
-        const { data: concurrentSession, error: concurrentError } = await adminClient
-          .from('user_sessions')
-          .select('revoked_at')
-          .eq('session_id', sessionId)
-          .eq('user_id', authData.user.id)
-          .maybeSingle()
-        if (concurrentError) return json({ error: `Could not verify the concurrent session write: ${concurrentError.message}` }, 500)
-        if (concurrentSession?.revoked_at) return json({ revoked: true })
-        if (concurrentSession) {
-          const { data, error } = await adminClient
-            .from('user_sessions')
-            .update({
-              last_seen_at: sessionUpdate.last_seen_at,
-              ...(sessionUpdate.ip_address ? { ip_address: sessionUpdate.ip_address } : {}),
-            })
-            .eq('session_id', sessionId)
-            .eq('user_id', authData.user.id)
-            .is('revoked_at', null)
-            .select('session_id, user_id')
-            .maybeSingle()
-          if (error) return json({ error: `Could not update the concurrent session write: ${error.message}` }, 500)
-          trackingWrite.data = data
-        }
-      } else if (trackingWrite.error) {
+      if (trackingWrite.error) {
         return json({
-          error: `Could not save the session to public.user_sessions: ${trackingWrite.error.message}`,
+          error: `Could not update the session in public.user_sessions: ${trackingWrite.error.message}`,
           code: trackingWrite.error.code,
         }, 500)
       }

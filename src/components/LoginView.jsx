@@ -115,10 +115,28 @@ function LoginView({ onLogin, teacherPassword }) {
           ? ['teacher', 'admin'].includes(profile.role)
           : profile.role === 'student'
         if (!roleMatchesPortal) {
-          await supabase.auth.signOut()
+          await supabase.auth.signOut({ scope: 'local' })
           setError(`এই অ্যাকাউন্টটি ${profile.role === 'student' ? 'ছাত্র' : 'শিক্ষক'} হিসেবে নিবন্ধিত। সঠিক ট্যাবে গিয়ে লগইন করুন।`)
           setIsLoading(false)
           return
+        }
+
+        const { data: sessionRegistration, error: sessionRegistrationError } = await supabase.functions.invoke(
+          'admin-user-management',
+          { body: { action: 'register-session' } },
+        )
+        if (sessionRegistrationError || sessionRegistration?.error || sessionRegistration?.revoked) {
+          let registrationMessage = sessionRegistrationError?.message || sessionRegistration?.error
+          if (sessionRegistrationError?.context && typeof sessionRegistrationError.context.clone === 'function') {
+            try {
+              const responseBody = await sessionRegistrationError.context.clone().json()
+              registrationMessage = responseBody.error || registrationMessage
+            } catch (responseError) {
+              console.error('Could not read the session registration error:', responseError)
+            }
+          }
+          await supabase.auth.signOut({ scope: 'local' })
+          throw new Error(registrationMessage || 'আপনার session তৈরি করা যায়নি। আবার login করুন।')
         }
 
         // 4. Pass session to parent component
