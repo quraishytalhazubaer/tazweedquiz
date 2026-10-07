@@ -273,6 +273,7 @@ export default function App() {
     if (!authUserId) return undefined;
 
     let isCheckingSession = false;
+    let hasReportedTrackingError = false;
     const checkSession = async () => {
       if (isCheckingSession) return;
       isCheckingSession = true;
@@ -288,6 +289,22 @@ export default function App() {
         }
       } catch (error) {
         console.error('Failed to check the active session:', error);
+        if (!hasReportedTrackingError) {
+          hasReportedTrackingError = true;
+          let errorMessage = error.message;
+          if (error.context && typeof error.context.clone === 'function') {
+            try {
+              const responseBody = await error.context.clone().json();
+              errorMessage = responseBody.error || errorMessage;
+            } catch (responseError) {
+              console.error('Could not read the session tracking error response:', responseError);
+            }
+          }
+          triggerNotification(
+            `সেশন ডাটাবেজে সংরক্ষণ করা যায়নি: ${errorMessage || 'Edge Function বা user_sessions table যাচাই করুন।'}`,
+            'error'
+          );
+        }
       } finally {
         isCheckingSession = false;
       }

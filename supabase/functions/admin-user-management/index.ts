@@ -90,7 +90,12 @@ Deno.serve(async (request) => {
 
     const { data: requester, error: requesterError } = await adminClient
       .from('profiles').select('role, teacher_permissions, approved, archived').eq('id', authData.user.id).single()
-    if (requesterError || !requester?.approved) {
+    if (requesterError) {
+      return payload.action === 'track-session'
+        ? json({ error: `Could not verify the account profile: ${requesterError.message}` }, 500)
+        : json({ error: 'Admin access required.' }, 403)
+    }
+    if (!requester?.approved) {
       return payload.action === 'track-session'
         ? json({ revoked: true })
         : json({ error: 'Admin access required.' }, 403)
@@ -116,33 +121,65 @@ Deno.serve(async (request) => {
         ip_address: getClientIp(request),
         last_seen_at: new Date().toISOString(),
       }
-      if (trackedSession) {
-        const update = {
-          last_seen_at: sessionUpdate.last_seen_at,
-          ...(sessionUpdate.ip_address ? { ip_address: sessionUpdate.ip_address } : {}),
-        }
-        const { error } = await adminClient
+      const trackingWrite = trackedSession
+        ? await adminClient
           .from('user_sessions')
-          .update(update)
+          .update({
+            last_seen_at: sessionUpdate.last_seen_at,
+            ...(sessionUpdate.ip_address ? { ip_address: sessionUpdate.ip_address } : {}),
+          })
           .eq('session_id', sessionId)
+          .eq('user_id', authData.user.id)
           .is('revoked_at', null)
-        if (error) return json({ error: error.message }, 400)
-      } else {
-        const { error } = await adminClient.from('user_sessions').insert(sessionUpdate)
-        if (error?.code === '23505') {
-          const { data: concurrentSession, error: retryError } = await adminClient
+          .select('session_id, user_id')
+          .maybeSingle()
+        : await adminClient
+          .from('user_sessions')
+          .insert(sessionUpdate)
+          .select('session_id, user_id')
+          .single()
+      if (trackingWrite.error?.code === '23505' && !trackedSession) {
+        const { data: concurrentSession, error: concurrentError } = await adminClient
+          .from('user_sessions')
+          .select('revoked_at')
+          .eq('session_id', sessionId)
+          .eq('user_id', authData.user.id)
+          .maybeSingle()
+        if (concurrentError) return json({ error: `Could not verify the concurrent session write: ${concurrentError.message}` }, 500)
+        if (concurrentSession?.revoked_at) return json({ revoked: true })
+        if (concurrentSession) {
+          const { data, error } = await adminClient
             .from('user_sessions')
-            .select('revoked_at')
+            .update({
+              last_seen_at: sessionUpdate.last_seen_at,
+              ...(sessionUpdate.ip_address ? { ip_address: sessionUpdate.ip_address } : {}),
+            })
             .eq('session_id', sessionId)
             .eq('user_id', authData.user.id)
+            .is('revoked_at', null)
+            .select('session_id, user_id')
             .maybeSingle()
-          if (retryError) return json({ error: retryError.message }, 400)
-          if (concurrentSession?.revoked_at) return json({ revoked: true })
-        } else if (error) {
-          return json({ error: error.message }, 400)
+          if (error) return json({ error: `Could not update the concurrent session write: ${error.message}` }, 500)
+          trackingWrite.data = data
         }
+      } else if (trackingWrite.error) {
+        return json({
+          error: `Could not save the session to public.user_sessions: ${trackingWrite.error.message}`,
+          code: trackingWrite.error.code,
+        }, 500)
       }
-      return json({ revoked: false })
+      if (trackingWrite.data?.session_id !== sessionId || trackingWrite.data?.user_id !== authData.user.id) {
+        const { data: currentSession, error: verifyError } = await adminClient
+          .from('user_sessions')
+          .select('session_id, user_id, revoked_at')
+          .eq('session_id', sessionId)
+          .eq('user_id', authData.user.id)
+          .maybeSingle()
+        if (verifyError) return json({ error: `Could not verify the saved session: ${verifyError.message}` }, 500)
+        if (!currentSession) return json({ error: 'The session write did not create a database row.' }, 500)
+        if (currentSession.revoked_at) return json({ revoked: true })
+      }
+      return json({ revoked: false, sessionId, userId: authData.user.id })
     }
 
     const isAdmin = requester.role === 'admin'
