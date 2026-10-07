@@ -101,6 +101,20 @@ Deno.serve(async (request) => {
       return json({ success: true })
     }
 
+    if (payload.action === 'track-session') {
+      if (!sessionId) return json({ revoked: true, reason: 'missing-session-id' })
+      const { data: trackedSession, error: sessionError } = await adminClient
+        .from('user_sessions')
+        .select('revoked_at')
+        .eq('session_id', sessionId)
+        .eq('user_id', authData.user.id)
+        .maybeSingle()
+      if (sessionError) {
+        return json({ error: `Could not check whether this session was revoked: ${sessionError.message}` }, 500)
+      }
+      if (trackedSession?.revoked_at) return json({ revoked: true })
+    }
+
     const { data: requester, error: requesterError } = await adminClient
       .from('profiles')
       .select('role, teacher_permissions, approved, archived, other_sessions_revoked_at, other_sessions_exempt_session_id')
@@ -129,7 +143,7 @@ Deno.serve(async (request) => {
     }
 
     if (payload.action === 'track-session') {
-      if (!sessionId) return json({ error: 'Session ID is not available.' }, 400)
+      if (!sessionId) return json({ revoked: true, reason: 'missing-session-id' })
       const { data: trackedSession, error: sessionError } = await adminClient
         .from('user_sessions')
         .select('revoked_at')

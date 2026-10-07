@@ -283,9 +283,19 @@ export default function App() {
         });
         if (error) throw error;
         if (data?.revoked) {
-          triggerNotification('আপনার সেশনটি Admin বন্ধ করেছেন।', 'error');
+          triggerNotification(
+            data.reason === 'missing-session-id'
+              ? 'আপনার session বৈধ নয়। আবার login করুন।'
+              : 'আপনার সেশনটি Admin বন্ধ করেছেন।',
+            'error'
+          );
           const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
           if (signOutError) throw signOutError;
+          sessionStorage.removeItem('teacherView');
+          setUser(null);
+          setGradingSubmission(null);
+          setSubmitStatus(null);
+          setIsStudentMenuOpen(false);
         }
       } catch (error) {
         console.error('Failed to check the active session:', error);
@@ -312,7 +322,16 @@ export default function App() {
 
     checkSession();
     const interval = window.setInterval(checkSession, 5000);
-    return () => window.clearInterval(interval);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') checkSession();
+    };
+    window.addEventListener('focus', checkSession);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', checkSession);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [authUserId]);
 
   // Synchronize initial local storage data cache
