@@ -12,6 +12,27 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   headers: { ...corsHeaders, 'Content-Type': 'application/json' }
 })
 
+const getSessionId = (token: string) => {
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const claims = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')))
+    return typeof claims.session_id === 'string' ? claims.session_id : null
+  } catch {
+    return null
+  }
+}
+
+const getClientIp = (request: Request) => {
+  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]
+  return [
+    request.headers.get('cf-connecting-ip'),
+    request.headers.get('x-real-ip'),
+    forwarded,
+  ].map((value) => value?.trim()).find((value) => value && value.length <= 64) || null
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -25,10 +46,92 @@ Deno.serve(async (request) => {
     const { data: authData, error: authError } = await adminClient.auth.getUser(accessToken)
     if (authError || !authData.user) return json({ error: 'Invalid session.' }, 401)
 
-    const { data: requester, error: requesterError } = await adminClient
-      .from('profiles').select('role, teacher_permissions, approved').eq('id', authData.user.id).single()
-    if (requesterError || !requester?.approved) return json({ error: 'Admin access required.' }, 403)
     const payload = await request.json()
+    const sessionId = getSessionId(accessToken)
+
+    if (payload.action === 'logout-other-sessions') {
+      if (!sessionId) return json({ error: 'Session ID is not available.' }, 400)
+      const { error: revokeError } = await adminClient.auth.admin.signOut(accessToken, 'others')
+      if (revokeError) return json({ error: revokeError.message }, 400)
+      const { error } = await adminClient
+        .from('user_sessions')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('user_id', authData.user.id)
+        .neq('session_id', sessionId)
+        .is('revoked_at', null)
+      if (error) return json({ error: error.message }, 400)
+      return json({ success: true })
+    }
+
+    if (payload.action === 'end-session') {
+      if (!sessionId) return json({ error: 'Session ID is not available.' }, 400)
+      const { error } = await adminClient
+        .from('user_sessions')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('session_id', sessionId)
+        .eq('user_id', authData.user.id)
+        .is('revoked_at', null)
+      if (error) return json({ error: error.message }, 400)
+      return json({ success: true })
+    }
+
+    const { data: requester, error: requesterError } = await adminClient
+      .from('profiles').select('role, teacher_permissions, approved, archived').eq('id', authData.user.id).single()
+    if (requesterError || !requester?.approved) {
+      return payload.action === 'track-session'
+        ? json({ revoked: true })
+        : json({ error: 'Admin access required.' }, 403)
+    }
+    if (requester.archived && requester.role !== 'student' && payload.action !== 'track-session') {
+      return json({ error: 'This account has been archived.' }, 403)
+    }
+
+    if (payload.action === 'track-session') {
+      if (!sessionId) return json({ error: 'Session ID is not available.' }, 400)
+      const { data: trackedSession, error: sessionError } = await adminClient
+        .from('user_sessions')
+        .select('revoked_at')
+        .eq('session_id', sessionId)
+        .eq('user_id', authData.user.id)
+        .maybeSingle()
+      if (sessionError) return json({ error: sessionError.message }, 400)
+      if (trackedSession?.revoked_at) return json({ revoked: true })
+
+      const sessionUpdate = {
+        session_id: sessionId,
+        user_id: authData.user.id,
+        ip_address: getClientIp(request),
+        last_seen_at: new Date().toISOString(),
+      }
+      if (trackedSession) {
+        const update = {
+          last_seen_at: sessionUpdate.last_seen_at,
+          ...(sessionUpdate.ip_address ? { ip_address: sessionUpdate.ip_address } : {}),
+        }
+        const { error } = await adminClient
+          .from('user_sessions')
+          .update(update)
+          .eq('session_id', sessionId)
+          .is('revoked_at', null)
+        if (error) return json({ error: error.message }, 400)
+      } else {
+        const { error } = await adminClient.from('user_sessions').insert(sessionUpdate)
+        if (error?.code === '23505') {
+          const { data: concurrentSession, error: retryError } = await adminClient
+            .from('user_sessions')
+            .select('revoked_at')
+            .eq('session_id', sessionId)
+            .eq('user_id', authData.user.id)
+            .maybeSingle()
+          if (retryError) return json({ error: retryError.message }, 400)
+          if (concurrentSession?.revoked_at) return json({ revoked: true })
+        } else if (error) {
+          return json({ error: error.message }, 400)
+        }
+      }
+      return json({ revoked: false })
+    }
+
     const isAdmin = requester.role === 'admin'
     const canEditGrades = requester.role === 'teacher'
       && requester.teacher_permissions?.grading?.edit === true
@@ -37,12 +140,33 @@ Deno.serve(async (request) => {
     }
 
     if (payload.action === 'list') {
+      const staleSessionsBefore = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      const { error: cleanupError } = await adminClient
+        .from('user_sessions')
+        .delete()
+        .lt('last_seen_at', staleSessionsBefore)
+      if (cleanupError) return json({ error: cleanupError.message }, 400)
+
       const { data, error } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 })
       if (error) return json({ error: error.message }, 400)
 
       const userIds = data.users.map((user) => user.id)
-      const { data: profiles } = await adminClient.from('profiles').select('id, role, teacher_permissions, full_name, employee_id, branch, designation, approved, batch').in('id', userIds)
+      const { data: profiles, error: profileError } = await adminClient.from('profiles').select('id, role, teacher_permissions, full_name, employee_id, branch, designation, approved, archived, batch').in('id', userIds)
+      if (profileError) return json({ error: profileError.message }, 400)
+      const activeSince = new Date(Date.now() - 3 * 60 * 1000).toISOString()
+      const { data: sessions, error: sessionsError } = await adminClient
+        .from('user_sessions')
+        .select('user_id, session_id, ip_address, created_at, last_seen_at')
+        .in('user_id', userIds)
+        .is('revoked_at', null)
+        .gte('last_seen_at', activeSince)
+        .order('last_seen_at', { ascending: false })
+      if (sessionsError) return json({ error: sessionsError.message }, 400)
       const profileById = new Map((profiles || []).map((profile) => [profile.id, profile]))
+      const sessionsByUser = new Map<string, typeof sessions>()
+      for (const session of sessions || []) {
+        sessionsByUser.set(session.user_id, [...(sessionsByUser.get(session.user_id) || []), session])
+      }
       return json({ users: data.users.map((user) => ({
         id: user.id,
         email: user.email,
@@ -54,8 +178,64 @@ Deno.serve(async (request) => {
         branch: profileById.get(user.id)?.branch || '',
         designation: profileById.get(user.id)?.designation || '',
         approved: profileById.get(user.id)?.approved === true,
-        batch: profileById.get(user.id)?.batch || []
+        archived: profileById.get(user.id)?.archived === true,
+        batch: profileById.get(user.id)?.batch || [],
+        sessions: (sessionsByUser.get(user.id) || []).map((session) => ({
+          session_id: session.session_id,
+          ip_address: session.ip_address,
+          created_at: session.created_at,
+          last_seen_at: session.last_seen_at,
+        })),
       })) })
+    }
+
+    if (payload.action === 'logout-user') {
+      if (typeof payload.userId !== 'string' || payload.userId === authData.user.id) {
+        return json({ error: 'A valid user ID other than your own is required.' }, 400)
+      }
+      const { error } = await adminClient
+        .from('user_sessions')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('user_id', payload.userId)
+        .is('revoked_at', null)
+      if (error) return json({ error: error.message }, 400)
+      return json({ success: true })
+    }
+
+    if (payload.action === 'set-archived') {
+      if (typeof payload.userId !== 'string' || typeof payload.archived !== 'boolean' || payload.userId === authData.user.id) {
+        return json({ error: 'A valid user ID and archive status are required.' }, 400)
+      }
+      const { data: target, error: targetError } = await adminClient
+        .from('profiles')
+        .select('role')
+        .eq('id', payload.userId)
+        .single()
+      if (targetError) return json({ error: targetError.message }, 400)
+      if (target.role === 'admin' && payload.archived) {
+        const { data: admins, error: adminsError } = await adminClient
+          .from('profiles')
+          .select('id')
+          .eq('role', 'admin')
+          .eq('approved', true)
+          .eq('archived', false)
+        if (adminsError) return json({ error: adminsError.message }, 400)
+        if ((admins || []).length <= 1) return json({ error: 'At least one active admin account must remain.' }, 400)
+      }
+      if (payload.archived) {
+        const { error: revokeError } = await adminClient
+          .from('user_sessions')
+          .update({ revoked_at: new Date().toISOString() })
+          .eq('user_id', payload.userId)
+          .is('revoked_at', null)
+        if (revokeError) return json({ error: revokeError.message }, 400)
+      }
+      const { error } = await adminClient
+        .from('profiles')
+        .update({ archived: payload.archived })
+        .eq('id', payload.userId)
+      if (error) return json({ error: error.message }, 400)
+      return json({ success: true, archived: payload.archived })
     }
 
     if (payload.action === 'update-password') {

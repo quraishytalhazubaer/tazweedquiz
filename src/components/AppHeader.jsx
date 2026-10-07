@@ -1,6 +1,6 @@
 import { ClipboardCheck, LogOut, Menu, User } from 'lucide-react'
 
-function AppHeader({ user, onLogout, onMenuOpen }) {
+function AppHeader({ user, onLogout, onLogoutOtherSessions, isRevokingOtherSessions, onMenuOpen }) {
   if (!user) return null
 
   return (
@@ -35,6 +35,18 @@ function AppHeader({ user, onLogout, onMenuOpen }) {
                 {user.name} ({user.role === 'student' ? 'পরীক্ষার্থী' : user.role === 'admin' ? 'Admin panel' : 'শিক্ষক প্যানেল'})
               </span>
             </div>
+            <button
+              type="button"
+              onClick={onLogoutOtherSessions}
+              disabled={isRevokingOtherSessions}
+              aria-label="Log out of all other sessions"
+              title="Log out of all other sessions"
+              className={`${user.role === 'student' ? 'hidden lg:flex' : 'flex'} items-center gap-2 text-amber-700 hover:text-white hover:bg-amber-700 px-3 py-2.5 rounded-2xl border border-amber-200 hover:border-transparent transition-all duration-250 text-xs font-black disabled:cursor-wait disabled:opacity-60`}
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden md:inline">{isRevokingOtherSessions ? 'Ending sessions…' : 'Log out other sessions'}</span>
+              <span className="md:hidden">{isRevokingOtherSessions ? 'Ending…' : 'Other sessions'}</span>
+            </button>
             <button
               onClick={onLogout}
               className={`${user.role !== 'student' ? 'flex' : 'hidden sm:flex'} items-center gap-2 text-rose-600 hover:text-white hover:bg-rose-600 px-4 py-2.5 rounded-2xl border border-rose-200 hover:border-transparent transition-all duration-250 text-xs font-black uppercase tracking-wider`}

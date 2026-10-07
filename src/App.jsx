@@ -94,6 +94,7 @@ export default function App() {
   const [teacherPage, setTeacherPage] = useState(() => sessionStorage.getItem('teacherPage') || (sessionStorage.getItem('teacherView') === 'users' ? 'users' : 'exam'));
   const [isDatabaseReachable, setIsDatabaseReachable] = useState(null); 
   const [checkingConnection, setCheckingConnection] = useState(true);
+  const [isRevokingOtherSessions, setIsRevokingOtherSessions] = useState(false);
 
   // Notification states
   const [notification, setNotification] = useState(null);
@@ -134,9 +135,11 @@ export default function App() {
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const studentBatches = Array.isArray(studentProfile.batch) ? studentProfile.batch : [];
-  const studentIsArchived = user?.role === 'student' &&
+  const studentIsArchived = user?.archived === true || (
+    user?.role === 'student' &&
     studentBatches.length > 0 &&
-    !studentBatches.some((batch) => activeBatches.includes(batch));
+    !studentBatches.some((batch) => activeBatches.includes(batch))
+  );
   const teacherPages = [
     ...(hasTeacherPermission(user, 'materials') ? ['materials'] : []),
     ...(hasTeacherPermission(user, 'exam') || hasTeacherPermission(user, 'marks') || hasTeacherPermission(user, 'grading') ? ['exam'] : []),
@@ -222,7 +225,7 @@ export default function App() {
 
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role, full_name, approved, teacher_permissions')
+        .select('role, full_name, approved, archived, teacher_permissions')
         .eq('id', session.user.id)
         .single();
 
@@ -235,6 +238,7 @@ export default function App() {
         setUser({
           role: profile.role,
           name: profile.full_name,
+          archived: profile.archived === true,
           permissions: profile.teacher_permissions || {},
           user: session.user,
         });
@@ -263,6 +267,36 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
+
+  const authUserId = user?.user?.id;
+  useEffect(() => {
+    if (!authUserId) return undefined;
+
+    let isCheckingSession = false;
+    const checkSession = async () => {
+      if (isCheckingSession) return;
+      isCheckingSession = true;
+      try {
+        const { data, error } = await supabase.functions.invoke('admin-user-management', {
+          body: { action: 'track-session' },
+        });
+        if (error) throw error;
+        if (data?.revoked) {
+          triggerNotification('আপনার সেশনটি Admin বন্ধ করেছেন।', 'error');
+          const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+          if (signOutError) throw signOutError;
+        }
+      } catch (error) {
+        console.error('Failed to check the active session:', error);
+      } finally {
+        isCheckingSession = false;
+      }
+    };
+
+    checkSession();
+    const interval = window.setInterval(checkSession, 30000);
+    return () => window.clearInterval(interval);
+  }, [authUserId]);
 
   // Synchronize initial local storage data cache
   useEffect(() => {
@@ -998,7 +1032,17 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    const { error: trackingError } = await supabase.functions.invoke('admin-user-management', {
+      body: { action: 'end-session' },
+    });
+    if (trackingError) console.error('Failed to close the tracked session:', trackingError);
+
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) {
+      console.error('Failed to sign out:', error);
+      triggerNotification('লগআউট করা যায়নি।', 'error');
+      return;
+    }
     sessionStorage.removeItem('teacherView');
     setUser(null);
     setGradingSubmission(null);
@@ -1009,6 +1053,24 @@ export default function App() {
       userBranch: '',
     });
     triggerNotification("সফলভাবে লগআউট করা হয়েছে।");
+  };
+
+  const handleLogoutOtherSessions = async () => {
+    if (!window.confirm('Log out of all other sessions? This session will remain active.')) return;
+
+    setIsRevokingOtherSessions(true);
+    try {
+      const { error } = await supabase.functions.invoke('admin-user-management', {
+        body: { action: 'logout-other-sessions' },
+      });
+      if (error) throw error;
+      triggerNotification('অন্যান্য সব সেশন থেকে লগআউট করা হয়েছে। এই সেশনটি চালু থাকবে।');
+    } catch (error) {
+      console.error('Failed to log out other sessions:', error);
+      triggerNotification('অন্য সেশনগুলো থেকে লগআউট করা যায়নি।', 'error');
+    } finally {
+      setIsRevokingOtherSessions(false);
+    }
   };
 
   const handleTeacherPageChange = (page) => {
@@ -1078,7 +1140,13 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-emerald-100 selection:text-emerald-900 transition-colors duration-300">
       
       <NotificationToast notification={notification} onClose={() => setNotification(null)} />
-      <AppHeader user={user} onLogout={handleLogout} onMenuOpen={() => setIsStudentMenuOpen(true)} />
+      <AppHeader
+        user={user}
+        onLogout={handleLogout}
+        onLogoutOtherSessions={handleLogoutOtherSessions}
+        isRevokingOtherSessions={isRevokingOtherSessions}
+        onMenuOpen={() => setIsStudentMenuOpen(true)}
+      />
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -1088,7 +1156,7 @@ export default function App() {
             teacherPassword={TEACHER_PASSWORD}
             studentAccessCode={STUDENT_ACCESS_CODE}
           />
-        ) : ['teacher', 'admin'].includes(user.role) ? (
+        ) : ['teacher', 'admin'].includes(user.role) && !user.archived ? (
           gradingSubmission ? (
             <GradingWorkspaceComponent 
               submission={gradingSubmission} 
@@ -1120,6 +1188,7 @@ export default function App() {
             )}
             {visibleTeacherPage === 'users' && user.role === 'admin' && (
               <AdminUserManagement
+                currentUserId={user.user.id}
                 onNotify={triggerNotification}
                 onBack={() => handleTeacherPageChange('exam')}
                 activeBatches={activeBatches}
@@ -1176,7 +1245,9 @@ export default function App() {
           )
         ) : (
           <StudentPortal
-            profile={studentProfile}
+            profile={user.role === 'student'
+              ? studentProfile
+              : { ...studentProfile, name: user.name, designation: user.role }}
             isArchived={studentIsArchived}
             onProfileSave={handleStudentProfileSave}
             profileSaving={profileSaving}
@@ -1188,6 +1259,8 @@ export default function App() {
             isDrawerOpen={isStudentMenuOpen}
             onDrawerClose={() => setIsStudentMenuOpen(false)}
             onLogout={handleLogout}
+            onLogoutOtherSessions={handleLogoutOtherSessions}
+            isRevokingOtherSessions={isRevokingOtherSessions}
             examView={
               <StudentTerminalComponent
                 formData={formData}

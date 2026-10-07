@@ -10,6 +10,7 @@ import {
   ChevronDown,
   KeyRound,
   Layers3,
+  LogOut,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -21,7 +22,7 @@ import {
 import { supabase } from "../supabaseClient";
 import { normalizeTeacherPermissions, TEACHER_FEATURES } from "../constants/teacherPermissions";
 
-function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBatchStatus }) {
+function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = [], onToggleBatchStatus }) {
   const [users, setUsers] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [passwords, setPasswords] = useState({});
@@ -181,6 +182,45 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
     setWorking(false);
   };
 
+  const logoutUser = async (user) => {
+    if (!user.sessions?.length) return onNotify('এই user-এর কোনো active session নেই।', 'error');
+    if (!window.confirm(`${user.email}-এর সব active session থেকে লগআউট করবেন?`)) return;
+    setWorking(true);
+    const { data, error } = await supabase.functions.invoke(
+      "admin-user-management",
+      { body: { action: "logout-user", userId: user.id } },
+    );
+    if (error || data?.error) {
+      onNotify(`User-কে লগআউট করা যায়নি: ${error?.message || data.error}`, "error");
+    } else {
+      onNotify("User-এর active session বন্ধ করা হয়েছে।", "success");
+      await loadUsers();
+    }
+    setWorking(false);
+  };
+
+  const setUserArchived = async (user) => {
+    const archived = !user.archived;
+    const action = archived ? "archive" : "unarchive";
+    if (!window.confirm(`${user.email} account ${action} করবেন?`)) return;
+    setWorking(true);
+    const { data, error } = await supabase.functions.invoke(
+      "admin-user-management",
+      { body: { action: "set-archived", userId: user.id, archived } },
+    );
+    if (error || data?.error) {
+      onNotify(`User ${action} করা যায়নি: ${error?.message || data.error}`, "error");
+    } else {
+      setUsers((current) => current.map((item) => item.id === user.id ? { ...item, archived } : item));
+      setSelectedUser((current) => current?.id === user.id ? { ...current, archived } : current);
+      onNotify(archived
+        ? "User archive করা হয়েছে; account-এ শুধু course materials access থাকবে।"
+        : "User unarchive করা হয়েছে।", "success");
+      await loadUsers();
+    }
+    setWorking(false);
+  };
+
   const assignBatch = async () => {
     const batch = batchToAssign.trim();
     if (!batch) return onNotify("একটি batch name লিখুন।", "error");
@@ -247,15 +287,31 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
             {user.full_name || "নাম নেই"}
           </p>
           <p className="text-xs text-slate-500 truncate">{user.email}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-500">
+            {user.sessions?.length ? (
+              <>
+                <span>Active session IPs:</span>
+                {user.sessions.map((session) => (
+                  <span
+                    key={session.session_id}
+                    title={`Last seen ${new Date(session.last_seen_at).toLocaleString()}`}
+                    className="rounded-full bg-slate-100 px-2 py-0.5 font-mono"
+                  >
+                    {session.ip_address || "IP unavailable"}
+                  </span>
+                ))}
+              </>
+            ) : "No active sessions"}
+          </div>
         </div>
       </div>
 
       {/* Right section: Password Input + Action Buttons */}
       <div className="flex items-center gap-2 w-full sm:w-auto">
         <span
-          className={`text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap shrink-0 ${user.approved ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+          className={`text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap shrink-0 ${user.archived ? "bg-slate-100 text-slate-600" : user.approved ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
         >
-          {user.approved ? "Approved" : "Pending"}
+          {user.archived ? "Archived" : user.approved ? "Approved" : "Pending"}
         </span>
         <div className="relative flex-1 sm:w-48" onClick={(event) => event.stopPropagation()}>
           <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -274,6 +330,32 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
           />
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              logoutUser(user);
+            }}
+            disabled={working || !user.sessions?.length || user.id === currentUserId}
+            className="p-2 text-amber-700 hover:bg-amber-50 rounded-xl disabled:opacity-40"
+            title="Log out of all active sessions"
+            aria-label={`Log out ${user.email} from all active sessions`}
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setUserArchived(user);
+            }}
+            disabled={working || user.id === currentUserId}
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl disabled:opacity-40"
+            title={user.archived ? "Unarchive user" : "Archive user"}
+            aria-label={`${user.archived ? "Unarchive" : "Archive"} ${user.email}`}
+          >
+            {user.archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+          </button>
           <button
             type="button"
             onClick={(event) => {
@@ -529,7 +611,7 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
                 User management
               </h2>
               <p className="text-sm text-slate-500 mt-1">
-                Role ও approval status অনুযায়ী account পরিচালনা করুন।
+                Role ও approval status অনুযায়ী account পরিচালনা করুন। Active session IPs portal activity থেকে সংগ্রহ হয়; user list refresh-এ 30 দিনের পুরোনো records পরিষ্কার হয়।
               </p>
             </div>
           </div>
@@ -707,7 +789,7 @@ function AdminUserManagement({ onNotify, onBack, activeBatches = [], onToggleBat
                   </button>
                 </div>
               </div>}
-              <div className={`rounded-2xl p-3 ${selectedUser.approved ? "bg-emerald-50" : "bg-amber-50"}`}><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Status</p><p className="mt-1 text-sm font-black text-slate-800">{selectedUser.approved ? "Approved" : "Pending"}</p></div>
+              <div className={`rounded-2xl p-3 ${selectedUser.archived ? "bg-slate-100" : selectedUser.approved ? "bg-emerald-50" : "bg-amber-50"}`}><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Status</p><p className="mt-1 text-sm font-black text-slate-800">{selectedUser.archived ? "Archived" : selectedUser.approved ? "Approved" : "Pending"}</p></div>
             </div>
             {selectedUser.role === "student" && <>
             <div className="mt-3 grid grid-cols-2 gap-3">

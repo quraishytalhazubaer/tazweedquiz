@@ -11,7 +11,7 @@ const navigation = [
   { id: 'profile', label: 'প্রোফাইল এডিট', icon: Pencil },
 ]
 
-function StudentPortal({ profile, isArchived = false, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit, isDrawerOpen, onDrawerClose, onLogout }) {
+function StudentPortal({ profile, isArchived = false, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit, isDrawerOpen, onDrawerClose, onLogout, onLogoutOtherSessions, isRevokingOtherSessions }) {
   const availableNavigation = isArchived ? navigation.filter((item) => item.id === 'materials') : navigation
   const [activeView, setActiveView] = useState(() => {
     const savedView = sessionStorage.getItem('studentPage')
@@ -114,7 +114,7 @@ function StudentPortal({ profile, isArchived = false, onProfileSave, profileSavi
       <main className="min-w-0">
         {isArchived && (
           <div className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-900 animate-slide-in">
-            আপনার ব্যাচ আর্কাইভ করা হয়েছে। আপনি শুধু কোর্স মেটেরিয়াল দেখতে পারবেন।
+            আপনার account বা batch archive করা হয়েছে। আপনি শুধু কোর্স মেটেরিয়াল দেখতে পারবেন।
           </div>
         )}
         {visibleActiveView === 'materials' && <CourseMaterials onNotify={onNotify} />}
@@ -195,6 +195,15 @@ function StudentPortal({ profile, isArchived = false, onProfileSave, profileSavi
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">{navigationContent}</div>
+            <button
+              type="button"
+              onClick={onLogoutOtherSessions}
+              disabled={isRevokingOtherSessions}
+              className="mb-2 flex w-full items-center gap-2 rounded-2xl border border-amber-200 px-4 py-3 text-xs font-black text-amber-700 transition-all hover:border-transparent hover:bg-amber-700 hover:text-white disabled:cursor-wait disabled:opacity-60"
+            >
+              <LogOut className="h-4 w-4" />
+              {isRevokingOtherSessions ? 'Ending other sessions…' : 'Log out other sessions'}
+            </button>
             <button
               type="button"
               onClick={onLogout}

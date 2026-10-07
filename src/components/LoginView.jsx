@@ -79,7 +79,7 @@ function LoginView({ onLogin, teacherPassword }) {
 
         if (signUpError) throw signUpError
 
-        if (data.session) await supabase.auth.signOut()
+        if (data.session) await supabase.auth.signOut({ scope: 'local' })
         setMessage('নিবন্ধন সফল হয়েছে। Admin approval পাওয়ার পর আপনি login করতে পারবেন।')
         setIsRegistering(false)
 
@@ -96,17 +96,17 @@ function LoginView({ onLogin, teacherPassword }) {
         // 2. Query user profile record from the profiles table
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('role, full_name, approved, teacher_permissions')
+          .select('role, full_name, approved, archived, teacher_permissions')
           .eq('id', authData.user.id)
           .single()
 
         if (profileError) {
-          await supabase.auth.signOut()
+          await supabase.auth.signOut({ scope: 'local' })
           throw new Error('ব্যবহারকারীর প্রোফাইল ডাটাবেসে পাওয়া যায়নি।')
         }
 
         if (!profile.approved) {
-          await supabase.auth.signOut()
+          await supabase.auth.signOut({ scope: 'local' })
           throw new Error('আপনার account এখনো admin approve করেননি।')
         }
 
@@ -125,6 +125,7 @@ function LoginView({ onLogin, teacherPassword }) {
         onLogin({ 
           role: profile.role, 
           name: profile.full_name, 
+          archived: profile.archived === true,
           permissions: profile.teacher_permissions || {},
           user: authData.user 
         })
