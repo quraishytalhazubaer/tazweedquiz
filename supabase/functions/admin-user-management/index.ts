@@ -12,13 +12,14 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   headers: { ...corsHeaders, 'Content-Type': 'application/json' }
 })
 
-const getSessionId = (token: string) => {
+const getSessionClaims = (token: string) => {
   try {
     const payload = token.split('.')[1]
     if (!payload) return null
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
     const claims = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')))
-    return typeof claims.session_id === 'string' ? claims.session_id : null
+    if (typeof claims.session_id !== 'string' || typeof claims.iat !== 'number') return null
+    return { sessionId: claims.session_id, issuedAt: claims.iat * 1000 }
   } catch {
     return null
   }
@@ -60,19 +61,31 @@ Deno.serve(async (request) => {
     if (authError || !authData.user) return json({ error: 'Invalid session.' }, 401)
 
     const payload = await request.json()
-    const sessionId = getSessionId(accessToken)
+    const sessionClaims = getSessionClaims(accessToken)
+    const sessionId = sessionClaims?.sessionId
 
     if (payload.action === 'logout-other-sessions') {
       if (!sessionId) return json({ error: 'Session ID is not available.' }, 400)
-      const { error: revokeError } = await adminClient.auth.admin.signOut(accessToken, 'others')
-      if (revokeError) return json({ error: revokeError.message }, 400)
-      const { error } = await adminClient
+      const revokedAt = new Date().toISOString()
+      const { error: markerError } = await adminClient
+        .from('profiles')
+        .update({
+          other_sessions_revoked_at: revokedAt,
+          other_sessions_exempt_session_id: sessionId,
+        })
+        .eq('id', authData.user.id)
+      if (markerError) return json({ error: `Could not mark other sessions for revocation: ${markerError.message}` }, 500)
+
+      const { error: trackedSessionsError } = await adminClient
         .from('user_sessions')
-        .update({ revoked_at: new Date().toISOString() })
+        .update({ revoked_at: revokedAt })
         .eq('user_id', authData.user.id)
         .neq('session_id', sessionId)
         .is('revoked_at', null)
-      if (error) return json({ error: error.message }, 400)
+      if (trackedSessionsError) return json({ error: `Other sessions were marked for revocation, but tracked sessions could not be updated: ${trackedSessionsError.message}` }, 500)
+
+      const { error: authRevokeError } = await adminClient.auth.admin.signOut(accessToken, 'others')
+      if (authRevokeError) return json({ error: `Other sessions were marked for revocation, but Supabase Auth could not revoke their refresh tokens: ${authRevokeError.message}` }, 500)
       return json({ success: true })
     }
 
@@ -89,7 +102,10 @@ Deno.serve(async (request) => {
     }
 
     const { data: requester, error: requesterError } = await adminClient
-      .from('profiles').select('role, teacher_permissions, approved, archived').eq('id', authData.user.id).single()
+      .from('profiles')
+      .select('role, teacher_permissions, approved, archived, other_sessions_revoked_at, other_sessions_exempt_session_id')
+      .eq('id', authData.user.id)
+      .single()
     if (requesterError) {
       return payload.action === 'track-session'
         ? json({ error: `Could not verify the account profile: ${requesterError.message}` }, 500)
@@ -99,6 +115,14 @@ Deno.serve(async (request) => {
       return payload.action === 'track-session'
         ? json({ revoked: true })
         : json({ error: 'Admin access required.' }, 403)
+    }
+    if (
+      payload.action === 'track-session'
+      && requester.other_sessions_revoked_at
+      && requester.other_sessions_exempt_session_id !== sessionId
+      && sessionClaims?.issuedAt <= new Date(requester.other_sessions_revoked_at).getTime()
+    ) {
+      return json({ revoked: true })
     }
     if (requester.archived && requester.role !== 'student' && payload.action !== 'track-session') {
       return json({ error: 'This account has been archived.' }, 403)

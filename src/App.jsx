@@ -311,7 +311,7 @@ export default function App() {
     };
 
     checkSession();
-    const interval = window.setInterval(checkSession, 30000);
+    const interval = window.setInterval(checkSession, 5000);
     return () => window.clearInterval(interval);
   }, [authUserId]);
 
