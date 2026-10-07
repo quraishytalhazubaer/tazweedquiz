@@ -24,13 +24,26 @@ const getSessionId = (token: string) => {
   }
 }
 
+const isValidIpAddress = (value: string) => {
+  const octets = value.split('.')
+  if (octets.length === 4 && octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255)) {
+    return true
+  }
+  if (!value.includes(':') || value.includes('%')) return false
+  try {
+    return new URL(`http://[${value}]/`).hostname.startsWith('[')
+  } catch {
+    return false
+  }
+}
+
 const getClientIp = (request: Request) => {
   const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]
   return [
     request.headers.get('cf-connecting-ip'),
     request.headers.get('x-real-ip'),
     forwarded,
-  ].map((value) => value?.trim()).find((value) => value && value.length <= 64) || null
+  ].map((value) => value?.trim()).find((value) => value && isValidIpAddress(value)) || null
 }
 
 Deno.serve(async (request) => {
