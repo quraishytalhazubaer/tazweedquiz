@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 // Import the database engine from the file right next to App.jsx
 import { supabase } from './supabaseClient'; 
@@ -113,6 +113,8 @@ export default function App() {
 
   // Teacher dashboard state
   const [submissions, setSubmissions] = useState([]);
+  const [submissionsLoaded, setSubmissionsLoaded] = useState(false);
+  const [submissionLoadError, setSubmissionLoadError] = useState(false);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [studentAttendanceRecords, setStudentAttendanceRecords] = useState([]);
   const [attendanceReport, setAttendanceReport] = useState([]);
@@ -124,6 +126,7 @@ export default function App() {
   const [branchFilter, setBranchFilter] = useState('');
   const [selectedReportBatch, setSelectedReportBatch] = useState('All');
   const [gradingSubmission, setGradingSubmission] = useState(null);
+  const [gradingSubmissionId, setGradingSubmissionId] = useState(() => sessionStorage.getItem('gradingSubmissionId') || '');
   const [savingMarks, setSavingMarks] = useState(false);
   const [studentProfile, setStudentProfile] = useState({
     name: '',
@@ -147,6 +150,10 @@ export default function App() {
     ...(user?.role === 'admin' ? ['users'] : []),
   ];
   const visibleTeacherPage = teacherPages.includes(teacherPage) ? teacherPage : teacherPages[0] || '';
+  const activeGradingSubmission = gradingSubmissionId
+    ? submissions.find((submission) => String(submission.id) === gradingSubmissionId)
+      || (String(gradingSubmission?.id) === gradingSubmissionId ? gradingSubmission : null)
+    : null;
 
   const triggerNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -155,7 +162,7 @@ export default function App() {
     }, 4500);
   };
 
-  async function fetchQuestions() {
+  const fetchQuestions = useCallback(async () => {
     setQuestionsLoading(true);
     setQuestionLoadError('');
     try {
@@ -188,10 +195,6 @@ export default function App() {
     } finally {
       setQuestionsLoading(false);
     }
-  }
-
-  useEffect(() => {
-    fetchQuestions();
   }, []);
 
   const fetchStudentAttendance = async (profileId) => {
@@ -272,6 +275,13 @@ export default function App() {
   useEffect(() => {
     if (!authUserId) return undefined;
 
+    const timeoutId = window.setTimeout(fetchQuestions, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [authUserId, fetchQuestions]);
+
+  useEffect(() => {
+    if (!authUserId) return undefined;
+
     let isCheckingSession = false;
     let hasReportedTrackingError = false;
     const checkSession = async () => {
@@ -294,8 +304,10 @@ export default function App() {
           const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
           if (signOutError) throw signOutError;
           sessionStorage.removeItem('teacherView');
+          sessionStorage.removeItem('gradingSubmissionId');
           setUser(null);
           setGradingSubmission(null);
+          setGradingSubmissionId('');
           setSubmitStatus(null);
           setIsStudentMenuOpen(false);
         }
@@ -538,6 +550,8 @@ export default function App() {
 
   async function fetchSubmissions() {
     setLoadingSubmissions(true);
+    setSubmissionLoadError(false);
+    setSubmissionsLoaded(false);
     try {
       const submissionColumns = [
         'id, profile_id, user_name, user_id, user_branch, designation, batch, date, timestamp',
@@ -571,13 +585,28 @@ export default function App() {
       }));
 
       setSubmissions(mappedList);
+      setSubmissionsLoaded(true);
     } catch (err) {
       console.error("Failed to fetch submissions", err);
+      setSubmissionLoadError(true);
       triggerNotification("ডাটাবেজ থেকে তথ্য সংগ্রহ করা যায়নি।", "error");
     } finally {
       setLoadingSubmissions(false);
     }
   }
+
+  const handleOpenGrading = (submission) => {
+    const submissionId = String(submission.id);
+    sessionStorage.setItem('gradingSubmissionId', submissionId);
+    setGradingSubmissionId(submissionId);
+    setGradingSubmission(submission);
+  };
+
+  const handleCloseGrading = () => {
+    sessionStorage.removeItem('gradingSubmissionId');
+    setGradingSubmissionId('');
+    setGradingSubmission(null);
+  };
 
   async function fetchAttendanceRecords(filters = {}) {
     setLoadingAttendance(true);
@@ -943,7 +972,7 @@ export default function App() {
         userBranch: identityDraft.userBranch,
         designation: identityDraft.designation,
       } : s));
-      setGradingSubmission(null);
+      handleCloseGrading();
       triggerNotification("শিক্ষার্থীর প্রাপ্ত নম্বর সফলভাবে সেভ করা হয়েছে।", "success");
     } catch (err) {
       console.error("Error updates values:", err);
@@ -1082,8 +1111,10 @@ export default function App() {
       return;
     }
     sessionStorage.removeItem('teacherView');
+    sessionStorage.removeItem('gradingSubmissionId');
     setUser(null);
     setGradingSubmission(null);
+    setGradingSubmissionId('');
     setSubmitStatus(null);
     setFormData({
       userName: '',
@@ -1195,15 +1226,50 @@ export default function App() {
             studentAccessCode={STUDENT_ACCESS_CODE}
           />
         ) : ['teacher', 'admin'].includes(user.role) && !user.archived ? (
-          gradingSubmission ? (
-            <GradingWorkspaceComponent 
-              submission={gradingSubmission} 
-              onBack={() => setGradingSubmission(null)} 
-              onSaveMarks={handleUpdateMarks}
-              saving={savingMarks}
-              questions={questions}
-              canEdit={hasTeacherPermission(user, 'grading', 'edit')}
-            />
+          gradingSubmissionId ? (
+            activeGradingSubmission ? questionsLoading ? (
+              <div className="max-w-5xl mx-auto rounded-3xl bg-white p-8 text-center font-semibold text-slate-600 shadow-sm">
+                প্রশ্ন লোড হচ্ছে...
+              </div>
+            ) : questionLoadError ? (
+              <div className="max-w-5xl mx-auto rounded-3xl bg-white p-8 text-center shadow-sm">
+                <p className="font-semibold text-rose-700">প্রশ্ন লোড করা যায়নি।</p>
+                <button type="button" onClick={fetchQuestions} className="mt-4 rounded-xl bg-slate-100 px-4 py-2 font-bold text-slate-700">
+                  আবার চেষ্টা করুন
+                </button>
+              </div>
+            ) : (
+              <GradingWorkspaceComponent
+                submission={activeGradingSubmission}
+                onBack={handleCloseGrading}
+                onSaveMarks={handleUpdateMarks}
+                saving={savingMarks}
+                questions={questions}
+                canEdit={hasTeacherPermission(user, 'grading', 'edit')}
+              />
+            ) : loadingSubmissions ? (
+              <div className="max-w-5xl mx-auto rounded-3xl bg-white p-8 text-center font-semibold text-slate-600 shadow-sm">
+                উত্তরপত্র লোড হচ্ছে...
+              </div>
+            ) : submissionLoadError ? (
+              <div className="max-w-5xl mx-auto rounded-3xl bg-white p-8 text-center shadow-sm">
+                <p className="font-semibold text-rose-700">উত্তরপত্র লোড করা যায়নি।</p>
+                <button type="button" onClick={fetchSubmissions} className="mt-4 rounded-xl bg-slate-100 px-4 py-2 font-bold text-slate-700">
+                  আবার চেষ্টা করুন
+                </button>
+              </div>
+            ) : submissionsLoaded ? (
+              <div className="max-w-5xl mx-auto rounded-3xl bg-white p-8 text-center shadow-sm">
+                <p className="font-semibold text-slate-700">উত্তরপত্রটি আর পাওয়া যাচ্ছে না।</p>
+                <button type="button" onClick={handleCloseGrading} className="mt-4 rounded-xl bg-slate-100 px-4 py-2 font-bold text-slate-700">
+                  ড্যাশবোর্ডে ফিরুন
+                </button>
+              </div>
+            ) : (
+              <div className="max-w-5xl mx-auto rounded-3xl bg-white p-8 text-center font-semibold text-slate-600 shadow-sm">
+                উত্তরপত্র লোড হচ্ছে...
+              </div>
+            )
           ) : (
             <>
             <TeacherNavigation activePage={visibleTeacherPage} onPageChange={handleTeacherPageChange} pages={teacherPages} />
@@ -1238,7 +1304,7 @@ export default function App() {
               submissions={submissions}
               selectedIds={selectedIds}
               setSelectedIds={setSelectedIds}
-              onGrade={(sub) => setGradingSubmission(sub)}
+              onGrade={handleOpenGrading}
               loading={loadingSubmissions}
               onRefresh={fetchSubmissions}
               onUpdateVivaMarks={handleUpdateVivaMarks}

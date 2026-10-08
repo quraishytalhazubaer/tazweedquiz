@@ -1,7 +1,7 @@
 import { CalendarClock, Copy, KeyRound, Loader2, Power, Printer, QrCode, RefreshCw } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
-import ibblLogo from '../assets/ibbplc.jpg'
+import ibblLogo from '/IBBL.jpg'
 
 const getLocalDateKey = (date = new Date()) => {
   const year = date.getFullYear()
@@ -234,8 +234,8 @@ function AttendancePanel({
           <div className="relative shrink-0 rounded-xl bg-white p-3 shadow-sm">
             <img src={attendanceQr} alt="আজকের হাজিরার QR কোড" className="h-52 w-52" />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="rounded-lg bg-white p-1.5 shadow-sm">
-                <img src={ibblLogo} alt="IBBL" className="h-11 w-11 rounded-full" />
+              <div className="rounded-lg p-1.5 shadow-sm">
+                <img src={ibblLogo} alt="IBBL" className="h-11 w-11" />
               </div>
             </div>
           </div>
@@ -245,7 +245,7 @@ function AttendancePanel({
               <h4 className="font-black">QR দিয়ে হাজিরা</h4>
             </div>
             <p className="mt-2 max-w-md text-sm text-slate-600">
-              শিক্ষার্থীরা মোবাইল ক্যামেরা দিয়ে এই QR স্ক্যান করে হাজিরা ফর্ম খুলতে পারবে। QR-এ IBBL-এর লোগো যুক্ত আছে।
+              শিক্ষার্থীরা মোবাইল ক্যামেরা দিয়ে এই QR স্ক্যান করে হাজিরা ফর্ম খুলতে পারবে।
             </p>
             <p className="mt-2 text-xs font-bold text-emerald-800">স্ক্যান করার পর Submit চাপতে হবে।</p>
           </div>
