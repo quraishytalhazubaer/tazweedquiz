@@ -85,6 +85,10 @@ export default function App() {
   const [questions, setQuestions] = useState([]);
   const [questionsLoading, setQuestionsLoading] = useState(true);
   const [questionLoadError, setQuestionLoadError] = useState('');
+  const [questionSets, setQuestionSets] = useState([]);
+  const [batchQuestionSets, setBatchQuestionSets] = useState({});
+  const [batchQuestionSetsLoading, setBatchQuestionSetsLoading] = useState(true);
+  const [batchQuestionSetsError, setBatchQuestionSetsError] = useState('');
   const [isExamActive, setIsExamActive] = useState(true);
   const [attendance, setAttendance] = useState({ isActive: false, code: '', date: '', generatedAt: null });
   const [activeBatches, setActiveBatches] = useState([]);
@@ -138,6 +142,15 @@ export default function App() {
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const studentBatches = Array.isArray(studentProfile.batch) ? studentProfile.batch : [];
+  const studentBatchOptions = studentBatches.length
+    ? studentBatches.filter((batch) => activeBatches.includes(batch))
+    : activeBatches;
+  const selectedExamBatch = studentBatchOptions.includes(formData.batch) ? formData.batch : '';
+  const selectedQuestionSet = batchQuestionSets[selectedExamBatch] || 1;
+  const selectedQuestionSetName = questionSets.find((set) => set.setNumber === selectedQuestionSet)?.name || `Set ${selectedQuestionSet}`;
+  const examQuestions = selectedExamBatch
+    ? questions.filter((question) => (question.questionSet || 1) === selectedQuestionSet)
+    : [];
   const studentIsArchived = user?.archived === true || (
     user?.role === 'student' &&
     studentBatches.length > 0 &&
@@ -146,6 +159,7 @@ export default function App() {
   const teacherPages = [
     ...(hasTeacherPermission(user, 'materials') ? ['materials'] : []),
     ...(hasTeacherPermission(user, 'exam') || hasTeacherPermission(user, 'marks') || hasTeacherPermission(user, 'grading') ? ['exam'] : []),
+    ...(hasTeacherPermission(user, 'questions') ? ['questions'] : []),
     ...(hasTeacherPermission(user, 'attendance') ? ['attendance'] : []),
     ...(user?.role === 'admin' ? ['users'] : []),
   ];
@@ -168,7 +182,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from('mcq_questions')
-        .select('id, question, options, correct_answer')
+        .select('id, question, options, correct_answer, question_set')
         .order('id', { ascending: true });
       if (error) throw error;
 
@@ -177,6 +191,7 @@ export default function App() {
         question: row.question,
         options: Array.isArray(row.options) ? row.options : Object.values(row.options || {}),
         correctAnswer: row.correct_answer,
+        questionSet: row.question_set || 1,
       }));
 
       if (!loadedQuestions.length || loadedQuestions.some((question) => (
@@ -194,6 +209,25 @@ export default function App() {
       setQuestions([]);
     } finally {
       setQuestionsLoading(false);
+    }
+  }, []);
+
+  const fetchBatchQuestionSets = useCallback(async () => {
+    try {
+      const [assignmentResult, questionSetResult] = await Promise.all([
+        supabase.from('exam_batch_question_sets').select('batch, question_set'),
+        supabase.from('exam_question_sets').select('set_number, name').order('set_number'),
+      ]);
+      if (assignmentResult.error) throw assignmentResult.error;
+      if (questionSetResult.error) throw questionSetResult.error;
+      setBatchQuestionSets(Object.fromEntries((assignmentResult.data || []).map((row) => [row.batch, row.question_set])));
+      setQuestionSets((questionSetResult.data || []).map((row) => ({ setNumber: row.set_number, name: row.name })));
+      setBatchQuestionSetsError('');
+    } catch (error) {
+      console.error('Failed to load batch question set assignments:', error);
+      setBatchQuestionSetsError(error?.message || 'ব্যাচের প্রশ্ন সেট লোড করা যায়নি।');
+    } finally {
+      setBatchQuestionSetsLoading(false);
     }
   }, []);
 
@@ -306,6 +340,9 @@ export default function App() {
           sessionStorage.removeItem('teacherView');
           sessionStorage.removeItem('gradingSubmissionId');
           setUser(null);
+          setBatchQuestionSets({});
+          setBatchQuestionSetsError('');
+          setBatchQuestionSetsLoading(true);
           setGradingSubmission(null);
           setGradingSubmissionId('');
           setSubmitStatus(null);
@@ -388,6 +425,26 @@ export default function App() {
           generatedAt: payload.new.attendance_generated_at || null,
         });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_batch_question_sets' }, (payload) => {
+        setBatchQuestionSets((current) => {
+          if (payload.eventType === 'DELETE') {
+            const updated = { ...current };
+            delete updated[payload.old.batch];
+            return updated;
+          }
+          return { ...current, [payload.new.batch]: payload.new.question_set };
+        });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_question_sets' }, (payload) => {
+        setQuestionSets((current) => {
+          if (payload.eventType === 'DELETE') {
+            return current.filter((set) => set.setNumber !== payload.old.set_number);
+          }
+          const updatedSet = { setNumber: payload.new.set_number, name: payload.new.name };
+          return [...current.filter((set) => set.setNumber !== updatedSet.setNumber), updatedSet]
+            .sort((first, second) => first.setNumber - second.setNumber);
+        });
+      })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance_records' }, () => {
         if (hasTeacherPermission(user, 'attendance')) fetchAttendanceRecords();
       })
@@ -401,10 +458,16 @@ export default function App() {
   // 2. Automated data fetching upon teacher verification updates
   useEffect(() => {
     if (['teacher', 'admin'].includes(user?.role)) {
-      if (hasTeacherPermission(user, 'exam') || hasTeacherPermission(user, 'marks') || hasTeacherPermission(user, 'grading')) fetchSubmissions();
+      if (hasTeacherPermission(user, 'exam') || hasTeacherPermission(user, 'questions') || hasTeacherPermission(user, 'marks') || hasTeacherPermission(user, 'grading')) fetchSubmissions();
       if (hasTeacherPermission(user, 'attendance')) fetchAttendanceRecords();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    const timeoutId = window.setTimeout(fetchBatchQuestionSets, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [user, fetchBatchQuestionSets]);
 
   useEffect(() => {
     if (user?.role !== 'student') return;
@@ -553,11 +616,16 @@ export default function App() {
     setSubmissionLoadError(false);
     setSubmissionsLoaded(false);
     try {
+      const canViewSubmissionDetails = hasTeacherPermission(user, 'exam')
+        || hasTeacherPermission(user, 'marks')
+        || hasTeacherPermission(user, 'grading');
       const submissionColumns = [
-        'id, profile_id, user_name, user_id, user_branch, designation, batch, date, timestamp',
+        ...(canViewSubmissionDetails
+          ? ['id, profile_id, user_name, user_id, user_branch, designation, batch, date, timestamp']
+          : ['batch']),
         ...(hasTeacherPermission(user, 'marks') ? ['status, marks, viva_marks, total_marks'] : []),
         ...(hasTeacherPermission(user, 'grading') || hasTeacherPermission(user, 'marks') ? ['answers'] : []),
-        'profile:profiles(full_name, employee_id, branch, designation, batch)',
+        ...(canViewSubmissionDetails ? ['profile:profiles(full_name, employee_id, branch, designation, batch)'] : []),
       ].join(', ');
       const { data, error } = await supabase
         .from('submissions')
@@ -693,6 +761,11 @@ export default function App() {
         ...prev,
         [key]: value
       };
+      if (key === 'batch') {
+        Object.keys(updated).forEach((field) => {
+          if (/^q\d+$/.test(field)) updated[field] = '';
+        });
+      }
       localStorage.setItem("examAnswers", JSON.stringify(updated));
       return updated;
     });
@@ -709,12 +782,17 @@ export default function App() {
       return;
     }
 
-    if (!formData.batch || !activeBatches.includes(formData.batch)) {
+    if (!formData.batch || !studentBatchOptions.includes(formData.batch)) {
       triggerNotification("দয়া করে একটি সক্রিয় ব্যাচ নির্বাচন করুন।", "error");
       return;
     }
 
-    const answersProvided = questions.length > 0 && questions.every((_, index) => formData[`q${index + 1}`]);
+    if (batchQuestionSetsLoading || batchQuestionSetsError) {
+      triggerNotification("ব্যাচের প্রশ্ন সেট এখনো লোড করা যায়নি। আবার চেষ্টা করুন।", "error");
+      return;
+    }
+
+    const answersProvided = examQuestions.length > 0 && examQuestions.every((_, index) => formData[`q${index + 1}`]);
     if (!answersProvided) {
       triggerNotification("দয়া করে অন্তত কিছু প্রশ্নের উত্তর নির্বাচন করুন।", "error");
       return;
@@ -757,11 +835,11 @@ export default function App() {
         return;
       }
 
-      const score = calculateAutoScore(formData, questions);
+      const score = calculateAutoScore(formData, examQuestions);
       
       // Isolate procedural questions choices out from layout identification payloads
       const answersPayload = {};
-      questions.forEach((question, i) => {
+      examQuestions.forEach((question, i) => {
         const key = `q${i + 1}`;
         const answer = formData[key] || '';
         answersPayload[key] = answer;
@@ -769,6 +847,7 @@ export default function App() {
         answersPayload[`question_${question.id}_text`] = question.question;
         answersPayload[`question_${question.id}_correct`] = question.correctAnswer;
       });
+      answersPayload.question_set = selectedQuestionSet;
 
       const profileBatches = Array.from(new Set([
         ...(Array.isArray(studentProfile.batch) ? studentProfile.batch : studentProfile.batch ? [studentProfile.batch] : []),
@@ -1058,6 +1137,42 @@ export default function App() {
     }
   };
 
+  const handleSaveBatchQuestionSet = async (batch, questionSet) => {
+    if (!hasTeacherPermission(user, 'questions', 'edit')) throw new Error('Question management edit permission required.');
+    const { error } = await supabase
+      .from('exam_batch_question_sets')
+      .upsert({ batch, question_set: questionSet }, { onConflict: 'batch' });
+    if (error) throw error;
+    setBatchQuestionSets((current) => ({ ...current, [batch]: questionSet }));
+  };
+
+  const handleAddQuestionSet = async (name) => {
+    if (!hasTeacherPermission(user, 'questions', 'edit')) throw new Error('Question management edit permission required.');
+    const { data, error } = await supabase
+      .from('exam_question_sets')
+      .insert({ name })
+      .select('set_number, name')
+      .single();
+    if (error) throw error;
+    const addedSet = { setNumber: data.set_number, name: data.name };
+    setQuestionSets((current) => [...current, addedSet].sort((first, second) => first.setNumber - second.setNumber));
+    return addedSet;
+  };
+
+  const handleRenameQuestionSet = async (setNumber, name) => {
+    if (!hasTeacherPermission(user, 'questions', 'edit')) throw new Error('Question management edit permission required.');
+    const { data, error } = await supabase
+      .from('exam_question_sets')
+      .update({ name })
+      .eq('set_number', setNumber)
+      .select('set_number, name')
+      .single();
+    if (error) throw error;
+    setQuestionSets((current) => current.map((set) => (
+      set.setNumber === data.set_number ? { setNumber: data.set_number, name: data.name } : set
+    )));
+  };
+
   const handleToggleBatchStatus = (batch) => handleSaveConfig({
     activeBatches: activeBatches.includes(batch)
       ? activeBatches.filter((activeBatch) => activeBatch !== batch)
@@ -1221,7 +1336,12 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {!user ? (
           <LoginViewComponent
-            onLogin={(session) => setUser(session)}
+            onLogin={(session) => {
+              setBatchQuestionSets({});
+              setBatchQuestionSetsError('');
+              setBatchQuestionSetsLoading(true);
+              setUser(session);
+            }}
             teacherPassword={TEACHER_PASSWORD}
             studentAccessCode={STUDENT_ACCESS_CODE}
           />
@@ -1299,8 +1419,10 @@ export default function App() {
                 onToggleBatchStatus={handleToggleBatchStatus}
               />
             )}
-            {visibleTeacherPage === 'exam' && <>
+            {(visibleTeacherPage === 'exam' || visibleTeacherPage === 'questions') && <>
               <TeacherDashboardComponent 
+              questionManagementOnly={visibleTeacherPage === 'questions'}
+              onQuestionManagementClose={teacherPages.includes('exam') ? () => handleTeacherPageChange('exam') : undefined}
               submissions={submissions}
               selectedIds={selectedIds}
               setSelectedIds={setSelectedIds}
@@ -1318,6 +1440,8 @@ export default function App() {
               triggerNotification={triggerNotification}
               openConfigSettings={() => setIsConfigModalOpen(true)}
               activeBatches={activeBatches}
+              batchQuestionSetsLoading={batchQuestionSetsLoading}
+              submissionsReady={submissionsLoaded && !loadingSubmissions && !submissionLoadError}
               selectedReportBatch={selectedReportBatch}
               setSelectedReportBatch={setSelectedReportBatch}
               onSaveConfigBatches={handleSaveConfig}
@@ -1326,14 +1450,20 @@ export default function App() {
               onGenerateIndividualPDF={generateIndividualPDF}
               onManageUsers={user.role === 'admin' ? () => handleTeacherPageChange('users') : undefined}
               canManageExam={hasTeacherPermission(user, 'exam', 'edit')}
+              canEditQuestions={hasTeacherPermission(user, 'questions', 'edit')}
               canViewMarks={hasTeacherPermission(user, 'marks')}
               canEditMarks={hasTeacherPermission(user, 'marks', 'edit')}
               canGrade={hasTeacherPermission(user, 'grading')}
               questions={questions}
+              questionSets={questionSets}
               onQuestionsChange={setQuestions}
+              onAddQuestionSet={handleAddQuestionSet}
+              onRenameQuestionSet={handleRenameQuestionSet}
+              batchQuestionSets={batchQuestionSets}
+              onSaveBatchQuestionSet={handleSaveBatchQuestionSet}
             />
             {/* Settings Configuration Modal */}
-              {hasTeacherPermission(user, 'exam', 'edit') && <ConfigModal
+              {visibleTeacherPage === 'exam' && hasTeacherPermission(user, 'exam', 'edit') && <ConfigModal
                 isOpen={isConfigModalOpen}
                 onClose={() => setIsConfigModalOpen(false)}
                 onSaveConfig={handleSaveConfig}
@@ -1373,15 +1503,20 @@ export default function App() {
                 submitStatus={submitStatus}
                 gradedMarks={studentSubmission?.status?.toLowerCase() === 'graded' ? studentSubmission.marks : null}
                 isExamActive={isExamActive}
-                activeBatches={activeBatches}
-                isSheetyReachable={isDatabaseReachable !== false && !questionLoadError}
-                checkingConnection={checkingConnection || questionsLoading}
+                activeBatches={studentBatchOptions}
+                questionSet={selectedQuestionSet}
+                questionSetName={selectedQuestionSetName}
+                isSheetyReachable={isDatabaseReachable !== false && !questionLoadError && !batchQuestionSetsError}
+                checkingConnection={checkingConnection || questionsLoading || batchQuestionSetsLoading}
                 onRetryConnection={() => {
                   checkDatabaseReachability();
                   fetchQuestions();
+                  setBatchQuestionSetsLoading(true);
+                  setBatchQuestionSetsError('');
+                  fetchBatchQuestionSets();
                 }}
-                connectionErrorMessage={questionLoadError}
-                questions={questions}
+                connectionErrorMessage={questionLoadError || batchQuestionSetsError}
+                questions={examQuestions}
               />
             }
           />

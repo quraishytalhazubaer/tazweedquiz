@@ -870,7 +870,7 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
                     ))}
                   </div>
                 )}
-                {accessRole === "admin" && <p className="mt-3 text-xs text-emerald-800">Admins have full access to all five features.</p>}
+                {accessRole === "admin" && <p className="mt-3 text-xs text-emerald-800">Admins have full access to all features.</p>}
                 <button
                   type="button"
                   onClick={saveStaffAccess}

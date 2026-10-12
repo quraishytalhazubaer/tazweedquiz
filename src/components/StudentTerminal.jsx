@@ -12,7 +12,9 @@ function StudentTerminal({
   onRetryConnection,
   connectionErrorMessage = '',
   questions,
-  activeBatches = [], // <-- Pass activeBatches prop with fallback
+  questionSet = 1,
+  questionSetName = `Set ${questionSet}`,
+  activeBatches = [],
 }) {
   if (checkingConnection) {
     return (
@@ -157,7 +159,7 @@ function StudentTerminal({
                 <select
                   required
                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-600 focus:outline-none transition font-semibold"
-                  value={formData.batch || ''}
+                  value={activeBatches.includes(formData.batch) ? formData.batch : ''}
                   onChange={(e) => onChange('batch', e.target.value)}
                 >
                   <option value="" disabled>-- আপনার ব্যাচ সিলেক্ট করুন --</option>
@@ -173,7 +175,19 @@ function StudentTerminal({
 
           {/* Question Section */}
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-slate-900 px-1">মূল্যায়ন প্রশ্নাবলী (Tajweed Questions)</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+              <h3 className="text-xl font-black text-slate-900">মূল্যায়ন প্রশ্নাবলী (Tajweed Questions)</h3>
+              {formData.batch && activeBatches.includes(formData.batch) && (
+                <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">{formData.batch} · {questionSetName}</span>
+              )}
+            </div>
+            {!questions.length && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+                {activeBatches.includes(formData.batch)
+                  ? 'এই ব্যাচের প্রশ্ন সেটে এখনো কোনো প্রশ্ন নেই। শিক্ষককে জানান।'
+                  : 'প্রশ্ন দেখতে প্রথমে আপনার ব্যাচ নির্বাচন করুন।'}
+              </p>
+            )}
             <div className="space-y-5">
               {questions.map((q, index) => {
                 const questionKey = `q${index + 1}`

@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { CheckSquare, Download, FileText, Loader2, Plus, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
+import { CheckSquare, Download, FileText, Loader2, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
 import AttendancePanel from './AttendancePanel'
 import QuestionManagement from './QuestionManagement'
 
 function TeacherDashboard({
+  questionManagementOnly = false,
+  onQuestionManagementClose,
   submissions = [],
   selectedIds = [],
   setSelectedIds,
@@ -28,19 +29,26 @@ function TeacherDashboard({
   openConfigSettings,
   onExportExcel,
   activeBatches = [],
+  batchQuestionSetsLoading = false,
+  submissionsReady = false,
   selectedReportBatch = 'All',
   setSelectedReportBatch,
   onGenerateSummaryPDF,
   onGenerateIndividualPDF,
   onManageUsers,
   canManageExam = false,
+  canEditQuestions = false,
   canViewMarks = false,
   canEditMarks = false,
   canGrade = false,
   questions = [],
+  questionSets = [],
   onQuestionsChange,
+  onAddQuestionSet,
+  onRenameQuestionSet,
+  batchQuestionSets = {},
+  onSaveBatchQuestionSet,
 }) {
-  const [questionManagerOpen, setQuestionManagerOpen] = useState(false)
   const branches = Array.from(new Set(submissions.map((sub) => sub.userBranch).filter(Boolean)))
 
   const submissionBatches = Array.from(
@@ -112,12 +120,22 @@ function TeacherDashboard({
 
   return (
     <>
-    {questionManagerOpen ? (
+    {questionManagementOnly ? (
       <QuestionManagement
         questions={questions}
+        questionSets={questionSets}
         onQuestionsChange={onQuestionsChange}
+        onAddQuestionSet={onAddQuestionSet}
+        onRenameQuestionSet={onRenameQuestionSet}
         onNotify={triggerNotification}
-        onClose={() => setQuestionManagerOpen(false)}
+        onClose={onQuestionManagementClose}
+        activeBatches={activeBatches}
+        submissions={submissions}
+        submissionsReady={submissionsReady}
+        batchQuestionSets={batchQuestionSets}
+        batchQuestionSetsLoading={batchQuestionSetsLoading}
+        canEditQuestions={canEditQuestions}
+        onSaveBatchQuestionSet={onSaveBatchQuestionSet}
       />
     ) : (
     <div className="space-y-6 animate-slide-in">
@@ -138,15 +156,6 @@ function TeacherDashboard({
             title="Settings"
           >
             <Settings className="h-4 w-4" /> Settings
-          </button>}
-
-          {canManageExam && <button
-            type="button"
-            onClick={() => setQuestionManagerOpen(true)}
-            className="p-3 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-2xl border border-emerald-200 transition-all flex items-center gap-2 font-bold text-xs"
-            title="Manage exam questions"
-          >
-            <Plus className="h-4 w-4" /> Questions
           </button>}
 
           {onManageUsers && <button onClick={onManageUsers} className="p-3 bg-slate-50 hover:bg-slate-150 text-slate-700 rounded-2xl border border-slate-200 transition-all flex items-center gap-2 font-bold text-xs" title="User management">

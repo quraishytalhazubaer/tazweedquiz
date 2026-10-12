@@ -382,7 +382,7 @@ Deno.serve(async (request) => {
         return json({ error: 'A valid staff user and role are required.' }, 400)
       }
 
-      const featureKeys = ['attendance', 'materials', 'exam', 'marks', 'grading']
+      const featureKeys = ['attendance', 'materials', 'exam', 'questions', 'marks', 'grading']
       const permissions = Object.fromEntries(featureKeys.map((key) => {
         const grant = payload.permissions?.[key] || {}
         const edit = grant.edit === true
