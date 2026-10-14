@@ -1,17 +1,19 @@
-import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, KeyRound, LogOut, Pencil, QrCode, ScanLine, UserRound, X } from 'lucide-react'
+import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardList, KeyRound, LogOut, Pencil, QrCode, ScanLine, UserRound, X } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useEffect, useState } from 'react'
+import StudentAssignments from './StudentAssignments'
 import CourseMaterials from './CourseMaterials'
 import ProfileEdit from './ProfileEdit'
 
 const navigation = [
   { id: 'materials', label: 'কোর্স মেটেরিয়াল', icon: BookOpen },
+  { id: 'assignments', label: 'অ্যাসাইনমেন্ট', icon: ClipboardList },
   { id: 'attendance', label: 'হাজিরা প্রদান', icon: QrCode },
   { id: 'exam', label: 'তাজবিদ মূল্যায়ন', icon: ClipboardCheck },
   { id: 'profile', label: 'প্রোফাইল এডিট', icon: Pencil },
 ]
 
-function StudentPortal({ profile, isArchived = false, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit, isDrawerOpen, onDrawerClose, onLogout, onLogoutOtherSessions, isRevokingOtherSessions }) {
+function StudentPortal({ profile, userId, isArchived = false, onProfileSave, profileSaving, examView, onNotify, activeBatches = [], attendance = {}, attendanceRecords = [], onAttendanceSubmit, isDrawerOpen, onDrawerClose, onLogout, onLogoutOtherSessions, isRevokingOtherSessions }) {
   const availableNavigation = isArchived ? navigation.filter((item) => item.id === 'materials') : navigation
   const [activeView, setActiveView] = useState(() => {
     const savedView = sessionStorage.getItem('studentPage')
@@ -109,6 +111,15 @@ function StudentPortal({ profile, isArchived = false, onProfileSave, profileSavi
     <div className="grid grid-cols-1 lg:grid-cols-[250px_minmax(0,1fr)] gap-6 items-start">
       <aside className="hidden lg:block bg-white rounded-3xl border border-slate-200/70 shadow-sm p-4 lg:sticky lg:top-24">
         {navigationContent}
+        <button
+          type="button"
+          onClick={onLogout}
+          aria-label="Log out"
+          title="Log out"
+          className="mt-4 flex w-full items-center gap-2 rounded-2xl border border-rose-200 px-4 py-3 text-left text-xs font-black uppercase tracking-wider text-rose-600 transition-all hover:border-transparent hover:bg-rose-600 hover:text-white"
+        >
+          <LogOut className="h-4 w-4" /> Log out
+        </button>
       </aside>
 
       <main className="min-w-0">
@@ -118,6 +129,7 @@ function StudentPortal({ profile, isArchived = false, onProfileSave, profileSavi
           </div>
         )}
         {visibleActiveView === 'materials' && <CourseMaterials onNotify={onNotify} />}
+        {!isArchived && visibleActiveView === 'assignments' && <StudentAssignments profile={profile} userId={userId} onNotify={onNotify} />}
         {!isArchived && visibleActiveView === 'profile' && <ProfileEdit profile={profile} onSave={onProfileSave} saving={profileSaving} activeBatches={activeBatches} />}
         {!isArchived && visibleActiveView === 'exam' && examView}
         {!isArchived && visibleActiveView === 'attendance' && (
@@ -207,6 +219,8 @@ function StudentPortal({ profile, isArchived = false, onProfileSave, profileSavi
             <button
               type="button"
               onClick={onLogout}
+              aria-label="Log out"
+              title="Log out"
               className="mt-auto flex w-full items-center gap-2 rounded-2xl border border-rose-200 px-4 py-3 text-xs font-black uppercase tracking-wider text-rose-600 transition-all hover:border-transparent hover:bg-rose-600 hover:text-white"
             >
               <LogOut className="h-4 w-4" /> Log out

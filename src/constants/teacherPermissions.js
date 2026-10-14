@@ -1,6 +1,7 @@
 export const TEACHER_FEATURES = [
   { key: 'attendance', label: 'Attendance' },
   { key: 'materials', label: 'Course materials' },
+  { key: 'assignments', label: 'Assignments' },
   { key: 'exam', label: 'Exam controls' },
   { key: 'questions', label: 'Question management' },
   { key: 'marks', label: 'Marks' },

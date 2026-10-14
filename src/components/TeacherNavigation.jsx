@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { BookOpen, ClipboardCheck, KeyRound, ListChecks, Menu, Users, X } from 'lucide-react'
+import { BookOpen, ClipboardCheck, ClipboardList, KeyRound, ListChecks, Menu, Users, X } from 'lucide-react'
 
 const navigationItems = [
   { id: 'materials', label: 'Course Material', icon: BookOpen },
+  { id: 'assignments', label: 'Assignments', icon: ClipboardList },
   { id: 'exam', label: 'Exam Dashboard', icon: ClipboardCheck },
   { id: 'questions', label: 'Question Management', icon: ListChecks },
   { id: 'attendance', label: 'Attendance', icon: KeyRound },

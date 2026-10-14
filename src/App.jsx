@@ -8,6 +8,7 @@ import LoginViewComponent from './components/LoginView';
 import StudentTerminalComponent from './components/StudentTerminal';
 import StudentPortal from './components/StudentPortal';
 import CourseMaterials from './components/CourseMaterials';
+import AssignmentManagement from './components/AssignmentManagement';
 import AttendancePanel from './components/AttendancePanel';
 import TeacherNavigation from './components/TeacherNavigation';
 import AdminUserManagement from './components/AdminUserManagement';
@@ -158,6 +159,7 @@ export default function App() {
   );
   const teacherPages = [
     ...(hasTeacherPermission(user, 'materials') ? ['materials'] : []),
+    ...(hasTeacherPermission(user, 'assignments') ? ['assignments'] : []),
     ...(hasTeacherPermission(user, 'exam') || hasTeacherPermission(user, 'marks') || hasTeacherPermission(user, 'grading') ? ['exam'] : []),
     ...(hasTeacherPermission(user, 'questions') ? ['questions'] : []),
     ...(hasTeacherPermission(user, 'attendance') ? ['attendance'] : []),
@@ -1395,6 +1397,7 @@ export default function App() {
             <TeacherNavigation activePage={visibleTeacherPage} onPageChange={handleTeacherPageChange} pages={teacherPages} />
             {!visibleTeacherPage && <p className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-900">আপনার কোনো staff feature access এখনো দেওয়া হয়নি। Admin-এর সঙ্গে যোগাযোগ করুন।</p>}
             {visibleTeacherPage === 'materials' && <CourseMaterials canManage={hasTeacherPermission(user, 'materials', 'edit')} onNotify={triggerNotification} />}
+            {visibleTeacherPage === 'assignments' && <AssignmentManagement canManage={hasTeacherPermission(user, 'assignments', 'edit')} onNotify={triggerNotification} />}
             {visibleTeacherPage === 'attendance' && (
               <AttendancePanel
                 attendance={attendance}
@@ -1482,6 +1485,7 @@ export default function App() {
             profile={user.role === 'student'
               ? studentProfile
               : { ...studentProfile, name: user.name, designation: user.role }}
+            userId={user.user.id}
             isArchived={studentIsArchived}
             onProfileSave={handleStudentProfileSave}
             profileSaving={profileSaving}
