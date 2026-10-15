@@ -11,6 +11,7 @@ import {
   KeyRound,
   Layers3,
   LogOut,
+  PhoneCall,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -286,6 +287,7 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
       tabIndex={0}
       onClick={() => openUser(user)}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") openUser(user);
       }}
       className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white border border-slate-200 rounded-2xl shadow-sm cursor-pointer hover:border-emerald-300 hover:shadow-md transition"
@@ -305,6 +307,17 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
             {user.full_name || "নাম নেই"}
           </p>
           <p className="text-xs text-slate-500 truncate">{user.email}</p>
+          {user.phone && (
+            <a
+              href={`tel:${user.phone.replace(/[^\d+]/g, "")}`}
+              onClick={(event) => event.stopPropagation()}
+              className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-900 hover:underline"
+              aria-label={`${user.full_name || user.email} কে ${user.phone} নম্বরে কল করুন`}
+            >
+              <PhoneCall className="h-3.5 w-3.5" />
+              {user.phone}
+            </a>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-500">
             {user.sessions?.length ? (
               <>
@@ -405,7 +418,7 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
 
   const visibleUsers = users.filter((user) => {
     const query = searchQuery.trim().toLowerCase();
-    const matchesSearch = !query || `${user.full_name || ""} ${user.email || ""}`.toLowerCase().includes(query);
+    const matchesSearch = !query || `${user.full_name || ""} ${user.email || ""} ${user.phone || ""}`.toLowerCase().includes(query);
     const userDate = user.created_at ? new Date(user.created_at).toLocaleDateString("en-CA") : "";
     return matchesSearch && (!createdDate || userDate === createdDate);
   });
@@ -780,6 +793,15 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
                 <div>
                   <h3 className="text-xl font-black text-slate-950">{selectedUser.full_name || "নাম নেই"}</h3>
                   <p className="text-sm text-slate-500">{selectedUser.email}</p>
+                  {selectedUser.phone && (
+                    <a
+                      href={`tel:${selectedUser.phone.replace(/[^\d+]/g, "")}`}
+                      className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 hover:text-emerald-900 hover:underline"
+                    >
+                      <PhoneCall className="h-4 w-4" />
+                      {selectedUser.phone}
+                    </a>
+                  )}
                 </div>
               </div>
               <button type="button" onClick={() => setSelectedUser(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="Close profile">

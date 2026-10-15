@@ -268,7 +268,7 @@ Deno.serve(async (request) => {
       if (error) return json({ error: error.message }, 400)
 
       const userIds = data.users.map((user) => user.id)
-      const { data: profiles, error: profileError } = await adminClient.from('profiles').select('id, role, teacher_permissions, full_name, employee_id, branch, designation, approved, archived, batch').in('id', userIds)
+      const { data: profiles, error: profileError } = await adminClient.from('profiles').select('id, role, teacher_permissions, full_name, employee_id, branch, designation, phone, approved, archived, batch').in('id', userIds)
       if (profileError) return json({ error: profileError.message }, 400)
       const activeSince = new Date(Date.now() - 3 * 60 * 1000).toISOString()
       const { data: sessions, error: sessionsError } = await adminClient
@@ -294,6 +294,7 @@ Deno.serve(async (request) => {
         employee_id: profileById.get(user.id)?.employee_id || '',
         branch: profileById.get(user.id)?.branch || '',
         designation: profileById.get(user.id)?.designation || '',
+        phone: profileById.get(user.id)?.phone || user.user_metadata?.phone || '',
         approved: profileById.get(user.id)?.approved === true,
         archived: profileById.get(user.id)?.archived === true,
         batch: profileById.get(user.id)?.batch || [],

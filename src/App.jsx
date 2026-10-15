@@ -1397,7 +1397,7 @@ export default function App() {
             <TeacherNavigation activePage={visibleTeacherPage} onPageChange={handleTeacherPageChange} pages={teacherPages} />
             {!visibleTeacherPage && <p className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-900">আপনার কোনো staff feature access এখনো দেওয়া হয়নি। Admin-এর সঙ্গে যোগাযোগ করুন।</p>}
             {visibleTeacherPage === 'materials' && <CourseMaterials canManage={hasTeacherPermission(user, 'materials', 'edit')} onNotify={triggerNotification} />}
-            {visibleTeacherPage === 'assignments' && <AssignmentManagement canManage={hasTeacherPermission(user, 'assignments', 'edit')} onNotify={triggerNotification} />}
+            {visibleTeacherPage === 'assignments' && <AssignmentManagement canManage={hasTeacherPermission(user, 'assignments', 'edit')} activeBatches={activeBatches} onNotify={triggerNotification} />}
             {visibleTeacherPage === 'attendance' && (
               <AttendancePanel
                 attendance={attendance}
