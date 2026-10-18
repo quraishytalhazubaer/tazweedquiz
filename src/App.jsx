@@ -147,9 +147,12 @@ export default function App() {
     ? studentBatches.filter((batch) => activeBatches.includes(batch))
     : activeBatches;
   const selectedExamBatch = studentBatchOptions.includes(formData.batch) ? formData.batch : '';
-  const selectedQuestionSet = batchQuestionSets[selectedExamBatch] || 1;
-  const selectedQuestionSetName = questionSets.find((set) => set.setNumber === selectedQuestionSet)?.name || `Set ${selectedQuestionSet}`;
-  const examQuestions = selectedExamBatch
+  const selectedQuestionSet = batchQuestionSets[selectedExamBatch] ?? null;
+  const isQuestionSetAssigned = selectedQuestionSet !== null;
+  const selectedQuestionSetName = isQuestionSetAssigned
+    ? questionSets.find((set) => set.setNumber === selectedQuestionSet)?.name || `Set ${selectedQuestionSet}`
+    : '';
+  const examQuestions = selectedExamBatch && isQuestionSetAssigned
     ? questions.filter((question) => (question.questionSet || 1) === selectedQuestionSet)
     : [];
   const studentIsArchived = user?.archived === true || (
@@ -791,6 +794,11 @@ export default function App() {
 
     if (batchQuestionSetsLoading || batchQuestionSetsError) {
       triggerNotification("ব্যাচের প্রশ্ন সেট এখনো লোড করা যায়নি। আবার চেষ্টা করুন।", "error");
+      return;
+    }
+
+    if (batchQuestionSets[formData.batch] == null) {
+      triggerNotification("এই ব্যাচে এখনো কোনো প্রশ্ন সেট অ্যাসাইন করা হয়নি।", "error");
       return;
     }
 
@@ -1508,8 +1516,8 @@ export default function App() {
                 gradedMarks={studentSubmission?.status?.toLowerCase() === 'graded' ? studentSubmission.marks : null}
                 isExamActive={isExamActive}
                 activeBatches={studentBatchOptions}
-                questionSet={selectedQuestionSet}
                 questionSetName={selectedQuestionSetName}
+                isQuestionSetAssigned={isQuestionSetAssigned}
                 isSheetyReachable={isDatabaseReachable !== false && !questionLoadError && !batchQuestionSetsError}
                 checkingConnection={checkingConnection || questionsLoading || batchQuestionSetsLoading}
                 onRetryConnection={() => {

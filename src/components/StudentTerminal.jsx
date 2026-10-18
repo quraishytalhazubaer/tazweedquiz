@@ -12,8 +12,9 @@ function StudentTerminal({
   onRetryConnection,
   connectionErrorMessage = '',
   questions,
-  questionSet = 1,
-  questionSetName = `Set ${questionSet}`,
+  questionSet = null,
+  questionSetName = '',
+  isQuestionSetAssigned = false,
   activeBatches = [],
 }) {
   if (checkingConnection) {
@@ -177,14 +178,16 @@ function StudentTerminal({
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-2 px-1">
               <h3 className="text-xl font-black text-slate-900">মূল্যায়ন প্রশ্নাবলী (Tajweed Questions)</h3>
-              {formData.batch && activeBatches.includes(formData.batch) && (
+              {formData.batch && activeBatches.includes(formData.batch) && isQuestionSetAssigned && (
                 <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">{formData.batch} · {questionSetName}</span>
               )}
             </div>
             {!questions.length && (
               <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
-                {activeBatches.includes(formData.batch)
-                  ? 'এই ব্যাচের প্রশ্ন সেটে এখনো কোনো প্রশ্ন নেই। শিক্ষককে জানান।'
+                {activeBatches.includes(formData.batch) && !isQuestionSetAssigned
+                  ? 'এই ব্যাচে এখনো কোনো প্রশ্ন সেট অ্যাসাইন করা হয়নি। শিক্ষককে জানান।'
+                  : activeBatches.includes(formData.batch)
+                    ? 'এই ব্যাচের প্রশ্ন সেটে এখনো কোনো প্রশ্ন নেই। শিক্ষককে জানান।'
                   : 'প্রশ্ন দেখতে প্রথমে আপনার ব্যাচ নির্বাচন করুন।'}
               </p>
             )}
@@ -240,7 +243,7 @@ function StudentTerminal({
             <p className="text-xs font-semibold text-slate-500 font-sans">আপনার সমস্ত প্রশ্নের উত্তর প্রদান নিশ্চিত করে নিচে ক্লিক করুন।</p>
             <button
               type="submit"
-              disabled={submitStatus === 'submitting'}
+              disabled={submitStatus === 'submitting' || !isQuestionSetAssigned}
               className="w-full sm:w-auto px-10 py-4 bg-[#1B4D1A] hover:bg-emerald-800 active:bg-emerald-950 text-white font-bold rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider"
             >
               {submitStatus === 'submitting' ? (

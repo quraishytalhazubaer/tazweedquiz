@@ -52,8 +52,8 @@ function QuestionManagement({
     submissions.map((submission) => Number(submission.question_set)).filter((setNumber) => questionSets.some((set) => set.setNumber === setNumber))
   )
   Object.entries(submittedCounts).forEach(([batch, count]) => {
-    if (count > 0) {
-      const setNumber = batchQuestionSets[batch] || 1
+    if (count > 0 && batchQuestionSets[batch] != null) {
+      const setNumber = batchQuestionSets[batch]
       submittedQuestionSets.add(setNumber)
     }
   })
@@ -158,10 +158,11 @@ function QuestionManagement({
   }
 
   const saveBatchAssignment = async (batch) => {
-    if (!canEditQuestions || !submissionsReady || submittedCounts[batch]) return
+    const questionSet = assignmentDrafts[batch] ?? batchQuestionSets[batch]
+    if (!canEditQuestions || !submissionsReady || submittedCounts[batch] || questionSet == null || questionSet === '') return
     setWorking(true)
     try {
-      await onSaveBatchQuestionSet(batch, Number(assignmentDrafts[batch] ?? batchQuestionSets[batch] ?? 1))
+      await onSaveBatchQuestionSet(batch, Number(questionSet))
       onNotify(`${batch} ব্যাচের প্রশ্ন সেট সংরক্ষণ করা হয়েছে।`, 'success')
     } catch (error) {
       onNotify(`ব্যাচের প্রশ্ন সেট সংরক্ষণ করা যায়নি: ${error.message || 'নেটওয়ার্ক সমস্যা'}`, 'error')
@@ -253,14 +254,18 @@ function QuestionManagement({
             )}
             <select
               aria-label={`Question set for ${batch}`}
-              value={assignmentDrafts[batch] ?? batchQuestionSets[batch] ?? 1}
-              onChange={(event) => setAssignmentDrafts((current) => ({ ...current, [batch]: Number(event.target.value) }))}
+              value={assignmentDrafts[batch] ?? batchQuestionSets[batch] ?? ''}
+              onChange={(event) => setAssignmentDrafts((current) => ({
+                ...current,
+                [batch]: event.target.value ? Number(event.target.value) : '',
+              }))}
               disabled={working || batchQuestionSetsLoading || !submissionsReady || !canEditQuestions || Boolean(submittedCounts[batch])}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
             >
+              <option value="" disabled>No set assigned</option>
               {questionSets.map((set) => <option key={set.setNumber} value={set.setNumber}>{set.name}</option>)}
             </select>
-            <button type="button" onClick={() => saveBatchAssignment(batch)} disabled={working || batchQuestionSetsLoading || !submissionsReady || !canEditQuestions || Boolean(submittedCounts[batch])} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+            <button type="button" onClick={() => saveBatchAssignment(batch)} disabled={working || batchQuestionSetsLoading || !submissionsReady || !canEditQuestions || Boolean(submittedCounts[batch]) || (assignmentDrafts[batch] ?? batchQuestionSets[batch]) == null || (assignmentDrafts[batch] ?? batchQuestionSets[batch]) === ''} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
               {batchQuestionSetsLoading ? 'Loading...' : submittedCounts[batch] ? 'Locked' : 'Save assignment'}
             </button>
           </div>
