@@ -1,0 +1,2 @@
+[functions.passkey-auth]
+verify_jwt = false

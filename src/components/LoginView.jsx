@@ -1,8 +1,30 @@
 import { useState } from 'react'
-import { AlertCircle, BookOpen, ChevronRight, Lock, Mail, ShieldCheck, User, KeyRound } from 'lucide-react'
+import { startAuthentication } from '@simplewebauthn/browser'
+import { AlertCircle, BookOpen, ChevronRight, Fingerprint, Lock, Mail, ShieldCheck, User, KeyRound } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 import logo from '../assets/ibbplc.jpg';
+
+const invokePasskey = async (action, body = {}) => {
+  const { data, error } = await supabase.functions.invoke('passkey-auth', {
+    body: { action, ...body },
+  })
+
+  if (error) {
+    let message = error.message
+    if (error.context && typeof error.context.clone === 'function') {
+      try {
+        const responseBody = await error.context.clone().json()
+        message = responseBody.error || message
+      } catch {
+        // Keep the Functions client's message if the response isn't JSON.
+      }
+    }
+    throw new Error(message || 'Fingerprint login could not be completed.')
+  }
+  if (data?.error) throw new Error(data.error)
+  return data
+}
 
 const OfficialIBBLogo = () => {
   return (
@@ -45,6 +67,61 @@ function LoginView({ onLogin, teacherPassword }) {
 
   const isTeacher = role === 'teacher'
 
+  const finishLogin = async (profile, user) => {
+    const { data: sessionRegistration, error: sessionRegistrationError } = await supabase.functions.invoke(
+      'admin-user-management',
+      { body: { action: 'register-session' } },
+    )
+    if (sessionRegistrationError || sessionRegistration?.error || sessionRegistration?.revoked) {
+      let registrationMessage = sessionRegistrationError?.message || sessionRegistration?.error
+      if (sessionRegistrationError?.context && typeof sessionRegistrationError.context.clone === 'function') {
+        try {
+          const responseBody = await sessionRegistrationError.context.clone().json()
+          registrationMessage = responseBody.error || registrationMessage
+        } catch (responseError) {
+          console.error('Could not read the session registration error:', responseError)
+        }
+      }
+      await supabase.auth.signOut({ scope: 'local' })
+      throw new Error(registrationMessage || 'আপনার session তৈরি করা যায়নি। আবার login করুন।')
+    }
+
+    onLogin({
+      role: profile.role,
+      name: profile.full_name,
+      archived: profile.archived === true,
+      permissions: profile.teacher_permissions || {},
+      user,
+    })
+  }
+
+  const completeLogin = async (user) => {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role, full_name, approved, archived, teacher_permissions')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      await supabase.auth.signOut({ scope: 'local' })
+      throw new Error('ব্যবহারকারীর প্রোফাইল ডাটাবেসে পাওয়া যায়নি।')
+    }
+    if (!profile.approved) {
+      await supabase.auth.signOut({ scope: 'local' })
+      throw new Error('আপনার account এখনো admin approve করেননি।')
+    }
+
+    const roleMatchesPortal = role === 'teacher'
+      ? ['teacher', 'admin'].includes(profile.role)
+      : profile.role === 'student'
+    if (!roleMatchesPortal) {
+      await supabase.auth.signOut({ scope: 'local' })
+      throw new Error(`এই অ্যাকাউন্টটি ${profile.role === 'student' ? 'ছাত্র' : 'শিক্ষক'} হিসেবে নিবন্ধিত। সঠিক ট্যাবে গিয়ে লগইন করুন।`)
+    }
+
+    await finishLogin(profile, user)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
@@ -84,72 +161,39 @@ function LoginView({ onLogin, teacherPassword }) {
         setIsRegistering(false)
 
       } else {
-        // --- LOGIN LOGIC ---
-        // 1. Authenticate credentials with Supabase Auth
         const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
 
         if (signInError) throw signInError
-
-        // 2. Query user profile record from the profiles table
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role, full_name, approved, archived, teacher_permissions')
-          .eq('id', authData.user.id)
-          .single()
-
-        if (profileError) {
-          await supabase.auth.signOut({ scope: 'local' })
-          throw new Error('ব্যবহারকারীর প্রোফাইল ডাটাবেসে পাওয়া যায়নি।')
-        }
-
-        if (!profile.approved) {
-          await supabase.auth.signOut({ scope: 'local' })
-          throw new Error('আপনার account এখনো admin approve করেননি।')
-        }
-
-        // 3. Verify user's database role matches current UI portal tab
-        const roleMatchesPortal = role === 'teacher'
-          ? ['teacher', 'admin'].includes(profile.role)
-          : profile.role === 'student'
-        if (!roleMatchesPortal) {
-          await supabase.auth.signOut({ scope: 'local' })
-          setError(`এই অ্যাকাউন্টটি ${profile.role === 'student' ? 'ছাত্র' : 'শিক্ষক'} হিসেবে নিবন্ধিত। সঠিক ট্যাবে গিয়ে লগইন করুন।`)
-          setIsLoading(false)
-          return
-        }
-
-        const { data: sessionRegistration, error: sessionRegistrationError } = await supabase.functions.invoke(
-          'admin-user-management',
-          { body: { action: 'register-session' } },
-        )
-        if (sessionRegistrationError || sessionRegistration?.error || sessionRegistration?.revoked) {
-          let registrationMessage = sessionRegistrationError?.message || sessionRegistration?.error
-          if (sessionRegistrationError?.context && typeof sessionRegistrationError.context.clone === 'function') {
-            try {
-              const responseBody = await sessionRegistrationError.context.clone().json()
-              registrationMessage = responseBody.error || registrationMessage
-            } catch (responseError) {
-              console.error('Could not read the session registration error:', responseError)
-            }
-          }
-          await supabase.auth.signOut({ scope: 'local' })
-          throw new Error(registrationMessage || 'আপনার session তৈরি করা যায়নি। আবার login করুন।')
-        }
-
-        // 4. Pass session to parent component
-        onLogin({ 
-          role: profile.role, 
-          name: profile.full_name, 
-          archived: profile.archived === true,
-          permissions: profile.teacher_permissions || {},
-          user: authData.user 
-        })
+        await completeLogin(authData.user)
       }
     } catch (err) {
       setError(err.message || 'একটি ত্রুটি ঘটেছে! আবার চেষ্টা করুন।')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleFingerprintLogin = async () => {
+    setError('')
+    setMessage('')
+    setIsLoading(true)
+    try {
+      const { options, challengeId } = await invokePasskey('authentication-options')
+      const response = await startAuthentication({ optionsJSON: options })
+      const { tokenHash } = await invokePasskey('verify-authentication', { response, challengeId })
+      if (!tokenHash) throw new Error('Fingerprint verification did not return a sign-in token.')
+      const { data: authData, error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: 'magiclink',
+      })
+      if (verifyError) throw verifyError
+      if (!authData.user) throw new Error('Fingerprint login did not return an account.')
+      await completeLogin(authData.user)
+    } catch (err) {
+      setError(err.message || 'Fingerprint login could not be completed.')
     } finally {
       setIsLoading(false)
     }
@@ -326,7 +370,24 @@ function LoginView({ onLogin, teacherPassword }) {
                     </>
                   )}
                 </button>
+
               </form>
+
+              {!isRegistering && (
+                <button
+                  type="button"
+                  onClick={handleFingerprintLogin}
+                  disabled={isLoading}
+                  className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-emerald-800/15 bg-emerald-50 px-6 py-4 text-sm font-black text-emerald-900 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-900/30 border-t-emerald-900" />
+                  ) : (
+                    <Fingerprint size={21} />
+                  )}
+                  Sign in with fingerprint
+                </button>
+              )}
 
               {/* Login / Register Toggle */}
               <div className="mt-6 text-center">
@@ -337,7 +398,7 @@ function LoginView({ onLogin, teacherPassword }) {
                     setError('')
                     setMessage('')
                   }}
-                  className="text-xs font-bold text-slate-500 hover:text-emerald-700 transition-colors"
+                  className="text-xs font-bold text-slate-500 hover:text-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isRegistering
                     ? 'ইতিমধ্যে অ্যাকাউন্ট আছে? প্রবেশ করুন'

@@ -15,6 +15,7 @@ import AdminUserManagement from './components/AdminUserManagement';
 import TeacherDashboardComponent from './components/TeacherDashboard';
 import GradingWorkspaceComponent from './components/GradingWorkspace';
 import ConfigModal from './components/SettingsModal';
+import AccountSettingsModal from './components/AccountSettingsModal';
 import { handleExportExcel, generateSummaryPDF, generateIndividualPDF } from './utils/reports';
 import { hasTeacherPermission } from './constants/teacherPermissions';
 
@@ -95,6 +96,7 @@ export default function App() {
   const [activeBatches, setActiveBatches] = useState([]);
   const [allBatches, setAllBatches] = useState([]); // Master list of all batches
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [isStudentMenuOpen, setIsStudentMenuOpen] = useState(false);
   const [teacherPage, setTeacherPage] = useState(() => sessionStorage.getItem('teacherPage') || (sessionStorage.getItem('teacherView') === 'users' ? 'users' : 'exam'));
   const [isDatabaseReachable, setIsDatabaseReachable] = useState(null); 
@@ -1340,7 +1342,13 @@ export default function App() {
         onLogoutOtherSessions={handleLogoutOtherSessions}
         isRevokingOtherSessions={isRevokingOtherSessions}
         onMenuOpen={() => setIsStudentMenuOpen(true)}
+        onOpenAccountSettings={() => setIsAccountSettingsOpen(true)}
       />
+      {isAccountSettingsOpen && <AccountSettingsModal
+        isOpen
+        onClose={() => setIsAccountSettingsOpen(false)}
+        user={user?.user}
+      />}
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">

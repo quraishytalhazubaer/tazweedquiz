@@ -1,6 +1,6 @@
-import { ClipboardCheck, LogOut, Menu, User } from 'lucide-react'
+import { ClipboardCheck, LogOut, Menu, Settings, User } from 'lucide-react'
 
-function AppHeader({ user, onLogout, onLogoutOtherSessions, isRevokingOtherSessions, onMenuOpen }) {
+function AppHeader({ user, onLogout, onLogoutOtherSessions, isRevokingOtherSessions, onMenuOpen, onOpenAccountSettings }) {
   if (!user) return null
 
   return (
@@ -45,6 +45,17 @@ function AppHeader({ user, onLogout, onLogoutOtherSessions, isRevokingOtherSessi
                 {user.name} ({user.role === 'student' ? 'পরীক্ষার্থী' : user.role === 'admin' ? 'Admin panel' : 'শিক্ষক প্যানেল'})
               </span>
             </div>
+
+            <button
+              type="button"
+              onClick={onOpenAccountSettings}
+              aria-label="Account settings"
+              title="Account settings"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 py-2 text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+            >
+              <Settings className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs font-bold">Settings</span>
+            </button>
 
             {/* Logout Other Sessions */}
             <button
