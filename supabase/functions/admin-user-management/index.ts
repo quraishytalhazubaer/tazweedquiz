@@ -47,6 +47,16 @@ const getClientIp = (request: Request) => {
   ].map((value) => value?.trim()).find((value) => value && isValidIpAddress(value)) || null
 }
 
+const fetchAllRows = async (createQuery: () => any) => {
+  const rows = []
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await createQuery().range(offset, offset + 999)
+    if (error) return { data: null, error }
+    rows.push(...(data || []))
+    if (!data || data.length < 1000) return { data: rows, error: null }
+  }
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -270,6 +280,56 @@ Deno.serve(async (request) => {
       const userIds = data.users.map((user) => user.id)
       const { data: profiles, error: profileError } = await adminClient.from('profiles').select('id, role, teacher_permissions, full_name, employee_id, branch, designation, phone, approved, archived, batch').in('id', userIds)
       if (profileError) return json({ error: profileError.message }, 400)
+      const studentProfiles = (profiles || []).filter((profile) => profile.role === 'student')
+      const studentProfileIds = studentProfiles.map((profile) => profile.id)
+      const studentIdChunks = Array.from({ length: Math.ceil(studentProfileIds.length / 100) }, (_, index) =>
+        studentProfileIds.slice(index * 100, (index + 1) * 100))
+      const [examSubmissionResults, assignmentSubmissionResults, attendanceResults, assignmentTargetResult] = await Promise.all([
+        Promise.all(studentIdChunks.map((ids) =>
+          fetchAllRows(() => adminClient.from('submissions').select('profile_id').in('profile_id', ids)))),
+        Promise.all(studentIdChunks.map((ids) =>
+          fetchAllRows(() => adminClient.from('assignment_submissions').select('assignment_id, profile_id, batch').in('profile_id', ids)))),
+        Promise.all(studentIdChunks.map((ids) =>
+          fetchAllRows(() => adminClient.from('attendance_records').select('profile_id, attendance_date').in('profile_id', ids)))),
+        fetchAllRows(() => adminClient.from('assignment_batches').select('assignment_id, batch')),
+      ])
+      const queryError = [
+        ...examSubmissionResults,
+        ...assignmentSubmissionResults,
+        ...attendanceResults,
+        assignmentTargetResult,
+      ].find((result) => result.error)?.error
+      if (queryError) return json({ error: queryError.message }, 400)
+      const examSubmissions = examSubmissionResults.flatMap((result) => result.data || [])
+      const assignmentSubmissions = assignmentSubmissionResults.flatMap((result) => result.data || [])
+      const attendanceRecords = attendanceResults.flatMap((result) => result.data || [])
+      const attendedExamCounts = new Map<string, number>()
+      for (const submission of examSubmissions) {
+        attendedExamCounts.set(submission.profile_id, (attendedExamCounts.get(submission.profile_id) || 0) + 1)
+      }
+      const attendanceDaysByUser = new Map<string, Set<string>>()
+      for (const record of attendanceRecords) {
+        const days = attendanceDaysByUser.get(record.profile_id) || new Set<string>()
+        days.add(record.attendance_date)
+        attendanceDaysByUser.set(record.profile_id, days)
+      }
+      const targetsByBatch = new Map<string, string[]>()
+      for (const target of assignmentTargetResult.data || []) {
+        targetsByBatch.set(target.batch, [...(targetsByBatch.get(target.batch) || []), target.assignment_id])
+      }
+      const assignmentSubmissionKeys = new Set(assignmentSubmissions.map((submission) =>
+        `${submission.assignment_id}:${submission.profile_id}:${submission.batch}`))
+      const assignmentProgressByUser = new Map(studentProfiles.map((profile) => {
+        const batches = Array.isArray(profile.batch) ? [...new Set(profile.batch)] : []
+        const assignmentTargets = batches.flatMap((batch) =>
+          (targetsByBatch.get(batch) || []).map((assignmentId) => ({ assignmentId, batch })))
+        const submittedCount = assignmentTargets.filter((target) =>
+          assignmentSubmissionKeys.has(`${target.assignmentId}:${profile.id}:${target.batch}`)).length
+        return [profile.id, {
+          assignmentAssignedCount: assignmentTargets.length,
+          assignmentSubmittedCount: submittedCount,
+        }]
+      }))
       const activeSince = new Date(Date.now() - 3 * 60 * 1000).toISOString()
       const { data: sessions, error: sessionsError } = await adminClient
         .from('user_sessions')
@@ -298,6 +358,12 @@ Deno.serve(async (request) => {
         approved: profileById.get(user.id)?.approved === true,
         archived: profileById.get(user.id)?.archived === true,
         batch: profileById.get(user.id)?.batch || [],
+        examSubmissionCount: attendedExamCounts.get(user.id) || 0,
+        attendanceDays: attendanceDaysByUser.get(user.id)?.size || 0,
+        ...(assignmentProgressByUser.get(user.id) || {
+          assignmentAssignedCount: 0,
+          assignmentSubmittedCount: 0,
+        }),
         sessions: (sessionsByUser.get(user.id) || []).map((session) => ({
           session_id: session.session_id,
           ip_address: session.ip_address,

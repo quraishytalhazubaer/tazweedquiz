@@ -155,6 +155,14 @@ Deno.serve(async (request) => {
       return json({ options, challengeId: options.challenge }, 200, expectedOrigin)
     }
 
+    if (payload.action === 'authentication-availability') {
+      const { count, error } = await adminClient
+        .from('passkey_credentials')
+        .select('id', { count: 'exact', head: true })
+      if (error) throw new Error('Could not check fingerprint login availability.')
+      return json({ enabled: (count || 0) > 0 }, 200, expectedOrigin)
+    }
+
     if (payload.action === 'passkey-status') {
       const user = await getAuthenticatedUser(request)
       await requireApprovedProfile(user.id)

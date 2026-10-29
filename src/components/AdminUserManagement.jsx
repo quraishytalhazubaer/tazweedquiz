@@ -334,6 +334,31 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
               </>
             ) : "No active sessions"}
           </div>
+          {user.role === "student" && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                user.examSubmissionCount > 0
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}>
+                Exam: {user.examSubmissionCount > 0 ? `Attended (${user.examSubmissionCount})` : "Not attended"}
+              </span>
+              <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700">
+                Attendance: {user.attendanceDays || 0} {user.attendanceDays === 1 ? "day" : "days"}
+              </span>
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                user.assignmentAssignedCount === 0 || user.assignmentSubmittedCount === user.assignmentAssignedCount
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-rose-50 text-rose-700"
+              }`}>
+                {user.assignmentAssignedCount === 0
+                  ? "No assignments"
+                  : user.assignmentSubmittedCount < user.assignmentAssignedCount
+                    ? `Assignments missing: ${user.assignmentAssignedCount - user.assignmentSubmittedCount}`
+                    : `All assignments submitted (${user.assignmentAssignedCount})`}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -642,7 +667,7 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
                 User management
               </h2>
               <p className="text-sm text-slate-500 mt-1">
-                Role ও approval status অনুযায়ী account পরিচালনা করুন। Active session IPs portal activity থেকে সংগ্রহ হয়; user list refresh-এ 30 দিনের পুরোনো records পরিষ্কার হয়।
+                Role ও approval status অনুযায়ী account পরিচালনা করুন। Student exam ও assignment status তাদের linked submission থেকে স্বয়ংক্রিয়ভাবে হিসাব করা হয়। Active session IPs portal activity থেকে সংগ্রহ হয়; user list refresh-এ 30 দিনের পুরোনো records পরিষ্কার হয়।
               </p>
             </div>
           </div>
@@ -840,6 +865,32 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
               <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Batches</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {(Array.isArray(selectedUser.batch) ? selectedUser.batch : selectedUser.batch ? [selectedUser.batch] : []).length ? (Array.isArray(selectedUser.batch) ? selectedUser.batch : [selectedUser.batch]).map((batch) => <span key={batch} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200">{batch}</span>) : <span className="text-sm text-slate-500">Unassigned</span>}
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-sky-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Attendance days</p>
+                <p className="mt-1 text-sm font-black text-slate-800">
+                  {selectedUser.attendanceDays || 0} {(selectedUser.attendanceDays || 0) === 1 ? "day" : "days"}
+                </p>
+              </div>
+              <div className={`rounded-2xl p-3 ${selectedUser.examSubmissionCount > 0 ? "bg-emerald-50" : "bg-amber-50"}`}>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Exam attendance</p>
+                <p className="mt-1 text-sm font-black text-slate-800">
+                  {selectedUser.examSubmissionCount > 0
+                    ? `Attended (${selectedUser.examSubmissionCount} submission${selectedUser.examSubmissionCount === 1 ? "" : "s"})`
+                    : "Not attended"}
+                </p>
+              </div>
+              <div className={`rounded-2xl p-3 ${selectedUser.assignmentAssignedCount === 0 || selectedUser.assignmentSubmittedCount === selectedUser.assignmentAssignedCount ? "bg-emerald-50" : "bg-rose-50"}`}>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Assignments</p>
+                <p className="mt-1 text-sm font-black text-slate-800">
+                  {selectedUser.assignmentAssignedCount === 0
+                    ? "No assignments"
+                    : selectedUser.assignmentSubmittedCount < selectedUser.assignmentAssignedCount
+                      ? `${selectedUser.assignmentAssignedCount - selectedUser.assignmentSubmittedCount} missing · ${selectedUser.assignmentSubmittedCount}/${selectedUser.assignmentAssignedCount} submitted`
+                      : `All ${selectedUser.assignmentAssignedCount} submitted`}
+                </p>
               </div>
             </div>
             </>}

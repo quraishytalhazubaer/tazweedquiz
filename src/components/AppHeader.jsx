@@ -25,19 +25,6 @@ function AppHeader({ user, onLogout, onLogoutOtherSessions, isRevokingOtherSessi
 
           {/* Right Side: Actions & User Details */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            {/* Hamburger Menu (Student Mobile) */}
-            {user.role === 'student' && (
-              <button
-                type="button"
-                onClick={onMenuOpen}
-                aria-label="মেনু খুলুন"
-                title="মেনু খুলুন"
-                className="lg:hidden p-2 text-emerald-800 hover:bg-emerald-50 rounded-xl transition-colors"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-            )}
-
             {/* User Badge */}
             <div className="hidden md:flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
               <User className="h-4 w-4 text-[#1B4D1A] shrink-0" />
@@ -56,6 +43,19 @@ function AppHeader({ user, onLogout, onLogoutOtherSessions, isRevokingOtherSessi
               <Settings className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline text-xs font-bold">Settings</span>
             </button>
+
+            {/* Hamburger Menu (Student Mobile) */}
+            {user.role === 'student' && (
+              <button
+                type="button"
+                onClick={onMenuOpen}
+                aria-label="মেনু খুলুন"
+                title="মেনু খুলুন"
+                className="lg:hidden p-2 text-emerald-800 hover:bg-emerald-50 rounded-xl transition-colors"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            )}
 
             {/* Logout Other Sessions */}
             <button

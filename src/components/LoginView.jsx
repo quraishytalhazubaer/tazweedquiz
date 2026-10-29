@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { startAuthentication } from '@simplewebauthn/browser'
 import { AlertCircle, BookOpen, ChevronRight, Fingerprint, Lock, Mail, ShieldCheck, User, KeyRound } from 'lucide-react'
 import { supabase } from '../supabaseClient'
@@ -64,8 +64,24 @@ function LoginView({ onLogin, teacherPassword }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [fingerprintLoginEnabled, setFingerprintLoginEnabled] = useState(false)
 
   const isTeacher = role === 'teacher'
+
+  useEffect(() => {
+    let active = true
+    invokePasskey('authentication-availability')
+      .then(({ enabled }) => {
+        if (active) setFingerprintLoginEnabled(enabled === true)
+      })
+      .catch((availabilityError) => {
+        console.error('Could not check fingerprint login availability:', availabilityError)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const finishLogin = async (profile, user) => {
     const { data: sessionRegistration, error: sessionRegistrationError } = await supabase.functions.invoke(
@@ -373,7 +389,7 @@ function LoginView({ onLogin, teacherPassword }) {
 
               </form>
 
-              {!isRegistering && (
+              {!isRegistering && fingerprintLoginEnabled && (
                 <button
                   type="button"
                   onClick={handleFingerprintLogin}

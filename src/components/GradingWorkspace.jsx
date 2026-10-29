@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertCircle, CheckCircle2, ChevronLeft, Edit3, Loader2, Save, X, XCircle } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, Edit3, Loader2, Save, X, XCircle } from 'lucide-react'
 import { getQuestionAnswer, getQuestionCorrectAnswer, getQuestionText } from '../utils/questionAnswers'
 
 function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions, canEdit = false }) {
@@ -41,13 +41,13 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions, 
     setIsIdentityEditing(false)
   }
 
-  let autoGradedMarks = 0
-  const marksPerQuestion = questions.length ? 10 / questions.length : 0
-  const matchDetails = questions.map((q, i) => {
+  const attendedQuestionSet = Number(submission?.question_set) || 1
+  const attendedQuestions = questions.filter((question) => (question.questionSet || 1) === attendedQuestionSet)
+  const marksPerQuestion = attendedQuestions.length ? 10 / attendedQuestions.length : 0
+  const matchDetails = attendedQuestions.map((q, i) => {
     const studentAns = getQuestionAnswer(submission, q, i)
     const correctAnswer = getQuestionCorrectAnswer(submission, q)
     const isCorrect = studentAns.trim() === correctAnswer.trim()
-    if (isCorrect) autoGradedMarks += marksPerQuestion
     return {
       num: i + 1,
       question: getQuestionText(submission, q),
@@ -56,6 +56,10 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions, 
       isCorrect,
     }
   })
+  const autoGradedMarks = matchDetails.reduce(
+    (total, item) => total + (item.isCorrect ? marksPerQuestion : 0),
+    0,
+  )
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-slide-in">
