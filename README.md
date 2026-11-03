@@ -26,3 +26,7 @@ Passkey sign-in is verified by the `passkey-auth` Supabase Edge Function. It doe
 4. Confirm the configured origin and RP ID match the public site before allowing users to enroll.
 
 The function uses Supabase's `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` environment values supplied to Edge Functions. Do not expose the service-role key in the frontend.
+
+## Password recovery
+
+Users can request a password reset email from the login screen and set a new password through the recovery link. In the Supabase Dashboard, add the deployed site origin to **Authentication → URL Configuration → Redirect URLs** so the recovery link can return to the portal.

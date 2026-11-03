@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 // Import the database engine from the file right next to App.jsx
 import { supabase } from './supabaseClient'; 
@@ -84,6 +84,12 @@ const calculateAutoScore = (answers, questions) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(
+    () => new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery',
+  );
+  const passwordRecoveryRef = useRef(
+    new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery',
+  );
   const [questions, setQuestions] = useState([]);
   const [questionsLoading, setQuestionsLoading] = useState(true);
   const [questionLoadError, setQuestionLoadError] = useState('');
@@ -259,6 +265,14 @@ export default function App() {
     let isMounted = true;
 
     const restoreUser = async (session) => {
+      if (passwordRecoveryRef.current) {
+        if (isMounted) {
+          setUser(null);
+          setIsAuthLoading(false);
+        }
+        return;
+      }
+
       if (!session?.user) {
         if (isMounted) {
           setUser(null);
@@ -301,7 +315,16 @@ export default function App() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') {
+      if (event === 'PASSWORD_RECOVERY') {
+        passwordRecoveryRef.current = true;
+        setIsPasswordRecovery(true);
+        setUser(null);
+        setIsAuthLoading(false);
+      } else if (event === 'SIGNED_OUT') {
+        passwordRecoveryRef.current = false;
+        setIsPasswordRecovery(false);
+        setTimeout(() => restoreUser(session), 0);
+      } else if (event === 'INITIAL_SESSION') {
         setTimeout(() => restoreUser(session), 0);
       }
     });
@@ -1359,6 +1382,12 @@ export default function App() {
               setBatchQuestionSetsError('');
               setBatchQuestionSetsLoading(true);
               setUser(session);
+            }}
+            isPasswordRecovery={isPasswordRecovery}
+            onPasswordRecoveryComplete={() => {
+              passwordRecoveryRef.current = false;
+              setIsPasswordRecovery(false);
+              setUser(null);
             }}
             teacherPassword={TEACHER_PASSWORD}
             studentAccessCode={STUDENT_ACCESS_CODE}

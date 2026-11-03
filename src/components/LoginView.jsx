@@ -50,14 +50,16 @@ const OfficialIBBLogo = () => {
   )
 }
 
-function LoginView({ onLogin, teacherPassword }) {
+function LoginView({ onLogin, teacherPassword, isPasswordRecovery, onPasswordRecoveryComplete }) {
   const [role, setRole] = useState('student') // 'student' | 'teacher'
   const [isRegistering, setIsRegistering] = useState(false)
+  const [isForgotPassword, setIsForgotPassword] = useState(false)
   
   // Form Input States
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [registrationKey, setRegistrationKey] = useState('')
   
   // Feedback States
@@ -145,7 +147,32 @@ function LoginView({ onLogin, teacherPassword }) {
     setIsLoading(true)
 
     try {
-      if (isRegistering) {
+      if (isPasswordRecovery) {
+        if (password !== confirmPassword) {
+          setError('নতুন পাসওয়ার্ড দুটি মিলছে না।')
+          return
+        }
+
+        const { error: updateError } = await supabase.auth.updateUser({ password })
+        if (updateError) throw updateError
+
+        const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+        if (signOutError) {
+          console.error('Password changed, but signing out failed:', signOutError)
+        }
+        onPasswordRecoveryComplete()
+        setPassword('')
+        setConfirmPassword('')
+        setMessage(signOutError
+          ? 'পাসওয়ার্ড পরিবর্তন হয়েছে, তবে sign out করা যায়নি। নিরাপত্তার জন্য sign out করে আবার login করুন।'
+          : 'পাসওয়ার্ড পরিবর্তন হয়েছে। নতুন পাসওয়ার্ড দিয়ে login করুন।')
+      } else if (isForgotPassword) {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: window.location.origin,
+        })
+        if (resetError) throw resetError
+        setMessage('আপনার account থাকলে password reset link ইমেইলে পাঠানো হয়েছে।')
+      } else if (isRegistering) {
         // --- SIGN UP LOGIC ---
         if (!name.trim()) {
           setError('আপনার পুরো নাম প্রদান করুন')
@@ -221,6 +248,8 @@ function LoginView({ onLogin, teacherPassword }) {
     setMessage('')
   }
 
+  const isRecoveryForm = isPasswordRecovery || isForgotPassword
+
   return (
     <div className="fixed inset-0 w-screen h-screen flex flex-col lg:flex-row bg-[#1a4517] font-sans selection:bg-emerald-100 overflow-y-auto lg:overflow-hidden z-50">
       <div className="absolute inset-0 pointer-events-none opacity-25">
@@ -240,15 +269,15 @@ function LoginView({ onLogin, teacherPassword }) {
               
               <div className="mb-8 text-center">
                 <h2 className="text-4xl font-black text-slate-950 tracking-tighter">
-                  {isRegistering ? 'Register' : 'Login'}
+                  {isPasswordRecovery ? 'Set New Password' : isForgotPassword ? 'Reset Password' : isRegistering ? 'Register' : 'Login'}
                 </h2>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-2">
-                  {isTeacher ? 'Teacher Gateway' : 'Student Gateway'}
+                  {isRecoveryForm ? 'Account Recovery' : isTeacher ? 'Teacher Gateway' : 'Student Gateway'}
                 </p>
               </div>
 
               {/* Role Switcher */}
-              <div className="flex p-1.5 bg-slate-100 rounded-2xl mb-8 relative">
+              {!isRecoveryForm && <div className="flex p-1.5 bg-slate-100 rounded-2xl mb-8 relative">
                 <div
                   className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-white rounded-xl shadow-md transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isTeacher ? 'translate-x-[calc(100%+4px)]' : 'translate-x-0'}`}
                 />
@@ -268,12 +297,12 @@ function LoginView({ onLogin, teacherPassword }) {
                   <ShieldCheck size={14} strokeWidth={3} />
                   Teacher
                 </button>
-              </div>
+              </div>}
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 
                 {/* Full Name field (Registration only) */}
-                {isRegistering && (
+                {!isRecoveryForm && isRegistering && (
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
                       Full Name
@@ -295,47 +324,94 @@ function LoginView({ onLogin, teacherPassword }) {
                 )}
 
                 {/* Email Field */}
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
-                    Email Address
-                  </label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-300 group-focus-within:text-emerald-700 transition-all">
-                      <Mail size={18} strokeWidth={3} />
+                {!isPasswordRecovery && (
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
+                      Email Address
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-300 group-focus-within:text-emerald-700 transition-all">
+                        <Mail size={18} strokeWidth={3} />
+                      </div>
+                      <input
+                        required
+                        type="email"
+                        placeholder="আপনার ইমেইল"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full pl-13 pr-6 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-800 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-emerald-500/20 focus:ring-4 focus:ring-emerald-500/5 transition-all text-base font-bold"
+                      />
                     </div>
-                    <input
-                      required
-                      type="email"
-                      placeholder="আপনার ইমেইল"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-13 pr-6 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-800 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-emerald-500/20 focus:ring-4 focus:ring-emerald-500/5 transition-all text-base font-bold"
-                    />
                   </div>
-                </div>
+                )}
 
                 {/* Password Field */}
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
-                    Password
-                  </label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-300 group-focus-within:text-emerald-700 transition-all">
-                      <Lock size={18} strokeWidth={3} />
+                {!isRecoveryForm && (
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
+                      Password
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-300 group-focus-within:text-emerald-700 transition-all">
+                        <Lock size={18} strokeWidth={3} />
+                      </div>
+                      <input
+                        required
+                        type="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full pl-13 pr-6 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-800 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-emerald-500/20 focus:ring-4 focus:ring-emerald-500/5 transition-all text-base font-bold"
+                      />
                     </div>
-                    <input
-                      required
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-13 pr-6 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-800 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-emerald-500/20 focus:ring-4 focus:ring-emerald-500/5 transition-all text-base font-bold"
-                    />
                   </div>
-                </div>
+                )}
+
+                {isPasswordRecovery && (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
+                        New Password
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-300 group-focus-within:text-emerald-700 transition-all">
+                          <Lock size={18} strokeWidth={3} />
+                        </div>
+                        <input
+                          required
+                          type="password"
+                          autoComplete="new-password"
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full pl-13 pr-6 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-800 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-emerald-500/20 focus:ring-4 focus:ring-emerald-500/5 transition-all text-base font-bold"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
+                        Confirm New Password
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-300 group-focus-within:text-emerald-700 transition-all">
+                          <Lock size={18} strokeWidth={3} />
+                        </div>
+                        <input
+                          required
+                          type="password"
+                          autoComplete="new-password"
+                          placeholder="••••••••"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="w-full pl-13 pr-6 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-800 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-emerald-500/20 focus:ring-4 focus:ring-emerald-500/5 transition-all text-base font-bold"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* Teacher Secret Key (Teacher Registration only) */}
-                {isRegistering && isTeacher && (
+                {!isRecoveryForm && isRegistering && isTeacher && (
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
                       Teacher Secret Key
@@ -381,7 +457,7 @@ function LoginView({ onLogin, teacherPassword }) {
                     <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
-                      <span>{isRegistering ? 'নিবন্ধন করুন' : 'প্রবেশ করুন'}</span>
+                      <span>{isPasswordRecovery ? 'পাসওয়ার্ড পরিবর্তন করুন' : isForgotPassword ? 'Reset link পাঠান' : isRegistering ? 'নিবন্ধন করুন' : 'প্রবেশ করুন'}</span>
                       <ChevronRight size={18} strokeWidth={3} className="transition-transform group-hover:translate-x-1" />
                     </>
                   )}
@@ -389,7 +465,7 @@ function LoginView({ onLogin, teacherPassword }) {
 
               </form>
 
-              {!isRegistering && fingerprintLoginEnabled && (
+              {!isRecoveryForm && !isRegistering && fingerprintLoginEnabled && (
                 <button
                   type="button"
                   onClick={handleFingerprintLogin}
@@ -406,17 +482,53 @@ function LoginView({ onLogin, teacherPassword }) {
               )}
 
               {/* Login / Register Toggle */}
+              {!isRecoveryForm && !isRegistering && (
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotPassword(true)
+                      setError('')
+                      setMessage('')
+                    }}
+                    className="text-xs font-bold text-emerald-800 hover:text-emerald-600 transition-colors"
+                  >
+                    পাসওয়ার্ড ভুলে গেছেন?
+                  </button>
+                </div>
+              )}
+
               <div className="mt-6 text-center">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsRegistering(!isRegistering)
+                  disabled={isLoading}
+                  onClick={async () => {
+                    if (isPasswordRecovery) {
+                      setIsLoading(true)
+                      try {
+                        const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+                        if (signOutError) throw signOutError
+                        onPasswordRecoveryComplete()
+                        setPassword('')
+                        setConfirmPassword('')
+                      } catch (signOutError) {
+                        setError(signOutError.message || 'Login screen-এ ফিরে যাওয়া যায়নি।')
+                      } finally {
+                        setIsLoading(false)
+                      }
+                    } else if (isForgotPassword) {
+                      setIsForgotPassword(false)
+                    } else {
+                      setIsRegistering(!isRegistering)
+                    }
                     setError('')
                     setMessage('')
                   }}
                   className="text-xs font-bold text-slate-500 hover:text-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isRegistering
+                  {isRecoveryForm
+                    ? 'Login-এ ফিরে যান'
+                    : isRegistering
                     ? 'ইতিমধ্যে অ্যাকাউন্ট আছে? প্রবেশ করুন'
                     : 'নতুন অ্যাকাউন্ট তৈরি করতে নিবন্ধন করুন'}
                 </button>

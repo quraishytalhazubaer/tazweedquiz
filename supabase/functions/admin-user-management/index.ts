@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from '@supabase/supabase-js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,8 +46,15 @@ const getClientIp = (request: Request) => {
   ].map((value) => value?.trim()).find((value) => value && isValidIpAddress(value)) || null
 }
 
-const fetchAllRows = async (createQuery: () => any) => {
-  const rows = []
+type PagedQuery<T> = {
+  range: (from: number, to: number) => PromiseLike<{
+    data: T[] | null
+    error: { message: string } | null
+  }>
+}
+
+const fetchAllRows = async <T>(createQuery: () => PagedQuery<T>) => {
+  const rows: T[] = []
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await createQuery().range(offset, offset + 999)
     if (error) return { data: null, error }
@@ -201,7 +207,8 @@ Deno.serve(async (request) => {
       if (
         revocationMarker.other_sessions_revoked_at
         && revocationMarker.other_sessions_exempt_session_id !== sessionId
-        && sessionClaims?.issuedAt <= new Date(revocationMarker.other_sessions_revoked_at).getTime()
+        && sessionClaims
+        && sessionClaims.issuedAt <= new Date(revocationMarker.other_sessions_revoked_at).getTime()
       ) {
         return json({ revoked: true })
       }
@@ -483,7 +490,7 @@ Deno.serve(async (request) => {
     }
 
     if (payload.action === 'approve-users') {
-      if (!Array.isArray(payload.userIds) || payload.userIds.length === 0 || payload.userIds.some((id) => typeof id !== 'string')) {
+      if (!Array.isArray(payload.userIds) || payload.userIds.length === 0 || payload.userIds.some((id: unknown) => typeof id !== 'string')) {
         return json({ error: 'At least one valid user ID is required.' }, 400)
       }
       const { error } = await adminClient.from('profiles').update({ approved: true }).in('id', payload.userIds)
@@ -492,7 +499,7 @@ Deno.serve(async (request) => {
     }
 
     if (payload.action === 'assign-batch') {
-      if (!Array.isArray(payload.userIds) || payload.userIds.length === 0 || payload.userIds.some((id) => typeof id !== 'string') || typeof payload.batch !== 'string' || !payload.batch.trim()) {
+      if (!Array.isArray(payload.userIds) || payload.userIds.length === 0 || payload.userIds.some((id: unknown) => typeof id !== 'string') || typeof payload.batch !== 'string' || !payload.batch.trim()) {
         return json({ error: 'At least one valid user ID and a batch name are required.' }, 400)
       }
       const batch = payload.batch.trim()
