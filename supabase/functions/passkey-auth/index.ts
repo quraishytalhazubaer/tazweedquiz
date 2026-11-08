@@ -1,10 +1,10 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient } from '@supabase/supabase-js'
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
   verifyAuthenticationResponse,
   verifyRegistrationResponse,
-} from 'npm:@simplewebauthn/server@13.3.0'
+} from '@simplewebauthn/server'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -93,7 +93,7 @@ const requireConfiguredOrigin = (origin: string) => {
     throw new Error('Passkey authentication has an invalid origin configuration.')
   }
   if (!origin || origin !== allowedOrigin) throw new Error('This origin is not allowed to use passkeys.')
-  return allowedOrigin
+  return { origin: allowedOrigin, rpID }
 }
 
 Deno.serve(async (request) => {
@@ -109,8 +109,11 @@ Deno.serve(async (request) => {
   })
 
   let expectedOrigin: string
+  let expectedRPID: string
   try {
-    expectedOrigin = requireConfiguredOrigin(origin)
+    const passkeyConfig = requireConfiguredOrigin(origin)
+    expectedOrigin = passkeyConfig.origin
+    expectedRPID = passkeyConfig.rpID
   } catch (error) {
     const status = error instanceof Error && error.message.includes('not configured') ? 500 : 403
     return json(
@@ -136,7 +139,7 @@ Deno.serve(async (request) => {
 
       const options = await generateRegistrationOptions({
         rpName,
-        rpID,
+        rpID: expectedRPID,
         userID: new TextEncoder().encode(user.id),
         userName: user.email || user.id,
         userDisplayName: user.user_metadata?.full_name || user.email || 'Portal user',
@@ -195,7 +198,7 @@ Deno.serve(async (request) => {
         response,
         expectedChallenge: challengeId,
         expectedOrigin,
-        expectedRPID: rpID,
+        expectedRPID,
         requireUserVerification: true,
       })
       if (!verification.verified || !verification.registrationInfo) {
@@ -216,7 +219,7 @@ Deno.serve(async (request) => {
 
     if (payload.action === 'authentication-options') {
       const options = await generateAuthenticationOptions({
-        rpID,
+        rpID: expectedRPID,
         userVerification: 'required',
       })
       await saveChallenge(options.challenge, 'authentication', null)
@@ -241,7 +244,7 @@ Deno.serve(async (request) => {
         response,
         expectedChallenge: challengeId,
         expectedOrigin,
-        expectedRPID: rpID,
+        expectedRPID,
         credential: {
           id: credential.credential_id,
           publicKey: fromBase64Url(credential.public_key),

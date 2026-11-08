@@ -16,6 +16,7 @@ import TeacherDashboardComponent from './components/TeacherDashboard';
 import GradingWorkspaceComponent from './components/GradingWorkspace';
 import ConfigModal from './components/SettingsModal';
 import AccountSettingsModal from './components/AccountSettingsModal';
+import TeacherContactSettings from './components/TeacherContactSettings';
 import { handleExportExcel, generateSummaryPDF, generateIndividualPDF } from './utils/reports';
 import { hasTeacherPermission } from './constants/teacherPermissions';
 
@@ -104,7 +105,7 @@ export default function App() {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [isStudentMenuOpen, setIsStudentMenuOpen] = useState(false);
-  const [teacherPage, setTeacherPage] = useState(() => sessionStorage.getItem('teacherPage') || (sessionStorage.getItem('teacherView') === 'users' ? 'users' : 'exam'));
+  const [teacherPage, setTeacherPage] = useState(() => sessionStorage.getItem('teacherDashboardPage') || 'materials');
   const [isDatabaseReachable, setIsDatabaseReachable] = useState(null); 
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [isRevokingOtherSessions, setIsRevokingOtherSessions] = useState(false);
@@ -174,9 +175,11 @@ export default function App() {
     ...(hasTeacherPermission(user, 'exam') || hasTeacherPermission(user, 'marks') || hasTeacherPermission(user, 'grading') ? ['exam'] : []),
     ...(hasTeacherPermission(user, 'questions') ? ['questions'] : []),
     ...(hasTeacherPermission(user, 'attendance') ? ['attendance'] : []),
+    ...(user?.role === 'teacher' || user?.role === 'admin' ? ['contact'] : []),
     ...(user?.role === 'admin' ? ['users'] : []),
   ];
   const visibleTeacherPage = teacherPages.includes(teacherPage) ? teacherPage : teacherPages[0] || '';
+  const isFullWidthStaffView = ['teacher', 'admin'].includes(user?.role) && !user.archived;
   const activeGradingSubmission = gradingSubmissionId
     ? submissions.find((submission) => String(submission.id) === gradingSubmissionId)
       || (String(gradingSubmission?.id) === gradingSubmissionId ? gradingSubmission : null)
@@ -1295,12 +1298,7 @@ export default function App() {
   const handleTeacherPageChange = (page) => {
     if (!teacherPages.includes(page)) return;
     setTeacherPage(page);
-    sessionStorage.setItem('teacherPage', page);
-    if (page === 'users') {
-      sessionStorage.setItem('teacherView', 'users');
-    } else {
-      sessionStorage.removeItem('teacherView');
-    }
+    sessionStorage.setItem('teacherDashboardPage', page);
   };
 
   const handleStudentProfileSave = async (profile) => {
@@ -1374,7 +1372,7 @@ export default function App() {
       />}
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main className={`${isFullWidthStaffView ? 'w-full px-3 sm:px-5 lg:px-6 py-6' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10'}`}>
         {!user ? (
           <LoginViewComponent
             onLogin={(session) => {
@@ -1438,8 +1436,15 @@ export default function App() {
               </div>
             )
           ) : (
-            <>
-            <TeacherNavigation activePage={visibleTeacherPage} onPageChange={handleTeacherPageChange} pages={teacherPages} />
+            <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-6">
+            <TeacherNavigation
+              activePage={visibleTeacherPage}
+              onPageChange={handleTeacherPageChange}
+              pages={teacherPages}
+              userName={user.name}
+              userRole={user.role}
+            />
+            <div className="min-w-0">
             {!visibleTeacherPage && <p className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-900">আপনার কোনো staff feature access এখনো দেওয়া হয়নি। Admin-এর সঙ্গে যোগাযোগ করুন।</p>}
             {visibleTeacherPage === 'materials' && <CourseMaterials canManage={hasTeacherPermission(user, 'materials', 'edit')} onNotify={triggerNotification} />}
             {visibleTeacherPage === 'assignments' && <AssignmentManagement canManage={hasTeacherPermission(user, 'assignments', 'edit')} activeBatches={activeBatches} onNotify={triggerNotification} />}
@@ -1458,6 +1463,7 @@ export default function App() {
                 canEdit={hasTeacherPermission(user, 'attendance', 'edit')}
               />
             )}
+            {visibleTeacherPage === 'contact' && <TeacherContactSettings user={user} onNotify={triggerNotification} />}
             {visibleTeacherPage === 'users' && user.role === 'admin' && (
               <AdminUserManagement
                 currentUserId={user.user.id}
@@ -1523,7 +1529,8 @@ export default function App() {
                 triggerNotification={triggerNotification}
               />}
             </>}
-            </>
+            </div>
+            </div>
           )
         ) : (
           <StudentPortal

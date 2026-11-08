@@ -5,7 +5,7 @@ function AppHeader({ user, onLogout, onLogoutOtherSessions, isRevokingOtherSessi
 
   return (
     <nav className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className={`${['teacher', 'admin'].includes(user.role) && !user.archived ? 'w-full px-3 sm:px-5 lg:px-6' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}`}>
         <div className="flex items-center justify-between min-h-[4.5rem] py-2.5 gap-2">
           
           {/* Left Side: Logo & Portal Title */}

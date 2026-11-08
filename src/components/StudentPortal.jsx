@@ -1,15 +1,17 @@
-import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardList, KeyRound, LogOut, Pencil, QrCode, ScanLine, UserRound, X } from 'lucide-react'
+import { BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardList, KeyRound, LogOut, MessageCircle, Pencil, QrCode, ScanLine, UserRound, X } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useEffect, useState } from 'react'
 import StudentAssignments from './StudentAssignments'
 import CourseMaterials from './CourseMaterials'
 import ProfileEdit from './ProfileEdit'
+import TeacherDirectory from './TeacherDirectory'
 
 const navigation = [
   { id: 'materials', label: 'কোর্স মেটেরিয়াল', icon: BookOpen },
   { id: 'assignments', label: 'অ্যাসাইনমেন্ট', icon: ClipboardList },
   { id: 'attendance', label: 'হাজিরা প্রদান', icon: QrCode },
   { id: 'exam', label: 'তাজবিদ মূল্যায়ন', icon: ClipboardCheck },
+  { id: 'teachers', label: 'শিক্ষকের সাথে যোগাযোগ', icon: MessageCircle },
   { id: 'profile', label: 'প্রোফাইল এডিট', icon: Pencil },
 ]
 
@@ -131,6 +133,7 @@ function StudentPortal({ profile, userId, isArchived = false, onProfileSave, pro
         {visibleActiveView === 'materials' && <CourseMaterials onNotify={onNotify} />}
         {!isArchived && visibleActiveView === 'assignments' && <StudentAssignments profile={profile} userId={userId} onNotify={onNotify} />}
         {!isArchived && visibleActiveView === 'profile' && <ProfileEdit profile={profile} onSave={onProfileSave} saving={profileSaving} activeBatches={activeBatches} />}
+        {!isArchived && visibleActiveView === 'teachers' && <TeacherDirectory />}
         {!isArchived && visibleActiveView === 'exam' && examView}
         {!isArchived && visibleActiveView === 'attendance' && (
           <section className="bg-white rounded-3xl border border-slate-200/70 shadow-sm p-8 text-center animate-slide-in">

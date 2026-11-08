@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BookOpen, ClipboardCheck, ClipboardList, KeyRound, ListChecks, Menu, Users, X } from 'lucide-react'
+import { BookOpen, ClipboardCheck, ClipboardList, KeyRound, ListChecks, Menu, MessageCircle, UserRound, Users, X } from 'lucide-react'
 
 const navigationItems = [
   { id: 'materials', label: 'Course Material', icon: BookOpen },
@@ -7,10 +7,11 @@ const navigationItems = [
   { id: 'exam', label: 'Exam Dashboard', icon: ClipboardCheck },
   { id: 'questions', label: 'Question Management', icon: ListChecks },
   { id: 'attendance', label: 'Attendance', icon: KeyRound },
+  { id: 'contact', label: 'My Contact', icon: MessageCircle },
   { id: 'users', label: 'User Management', icon: Users },
 ]
 
-function TeacherNavigation({ activePage, onPageChange, pages = navigationItems.map(({ id }) => id) }) {
+function TeacherNavigation({ activePage, onPageChange, userName, userRole, pages = navigationItems.map(({ id }) => id) }) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const visibleItems = navigationItems.filter(({ id }) => pages.includes(id))
 
@@ -30,7 +31,7 @@ function TeacherNavigation({ activePage, onPageChange, pages = navigationItems.m
 
   return (
     <>
-      <div className="mb-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:hidden">
+      <div className="mb-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:hidden">
         <button
           type="button"
           onClick={() => setIsDrawerOpen(true)}
@@ -45,26 +46,40 @@ function TeacherNavigation({ activePage, onPageChange, pages = navigationItems.m
           {visibleItems.find(({ id }) => id === activePage)?.label}
         </span>
       </div>
-      <nav className="mb-8 hidden flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm md:flex" aria-label="Teacher pages">
-        {visibleItems.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => selectPage(id)}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-black transition-colors sm:min-w-[150px] ${
-              activePage === id
-                ? 'bg-emerald-800 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800'
-            }`}
-            aria-current={activePage === id ? 'page' : undefined}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
-      </nav>
+      <aside className="sticky top-24 hidden max-h-[calc(100vh-7rem)] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:block">
+        <div className="rounded-2xl bg-gradient-to-br from-emerald-950 to-teal-800 p-4 text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-emerald-100">
+            <UserRound className="h-5 w-5" />
+          </div>
+          <p className="mt-3 truncate text-sm font-black">{userName || (userRole === 'admin' ? 'Administrator' : 'Teacher')}</p>
+          <p className="mt-1 text-[11px] font-bold text-emerald-200">
+            {userRole === 'admin' ? 'Admin Dashboard' : 'Teacher Dashboard'}
+          </p>
+        </div>
+        <p className="mb-2 mt-5 px-3 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+          Workspace
+        </p>
+        <nav className="space-y-1" aria-label="Teacher pages">
+          {visibleItems.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => selectPage(id)}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold transition-colors ${
+                activePage === id
+                  ? 'bg-emerald-800 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-900'
+              }`}
+              aria-current={activePage === id ? 'page' : undefined}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+      </aside>
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-[90] md:hidden">
+        <div className="fixed inset-0 z-[90] lg:hidden">
           <button
             type="button"
             onClick={() => setIsDrawerOpen(false)}
