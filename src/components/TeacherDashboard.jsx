@@ -1,4 +1,5 @@
-import { CheckSquare, Download, FileText, Loader2, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, Download, FileText, Loader2, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
 import AttendancePanel from './AttendancePanel'
 import QuestionManagement from './QuestionManagement'
 
@@ -49,6 +50,8 @@ function TeacherDashboard({
   batchQuestionSets = {},
   onSaveBatchQuestionSet,
 }) {
+  const [sortBy, setSortBy] = useState('id')
+  const [sortDirection, setSortDirection] = useState('asc')
   const branches = Array.from(new Set(submissions.map((sub) => sub.userBranch).filter(Boolean)))
 
   const submissionBatches = Array.from(
@@ -60,6 +63,16 @@ function TeacherDashboard({
   )
   const columnCount = 5 + (canViewMarks ? 5 : 0) + (canViewMarks || canGrade ? 1 : 0)
 
+  const getTotalMarksForSort = (submission) => {
+    const writtenMarks = submission.marks !== undefined && submission.marks !== null
+      ? parseFloat(submission.marks)
+      : null
+    const vivaMarks = submission.viva_marks ?? submission.vivaMarks ?? ''
+    return submission.total_marks ?? submission.totalMarks ?? (
+      writtenMarks !== null ? writtenMarks + (parseFloat(vivaMarks) || 0) : ''
+    )
+  }
+
   const filteredSubmissions = submissions.filter((sub) => {
     const query = searchQuery.toLowerCase()
     const matchSearch =
@@ -67,7 +80,9 @@ function TeacherDashboard({
       (sub.userId && sub.userId.toString().toLowerCase().includes(query)) ||
       (sub.userBranch && sub.userBranch.toLowerCase().includes(query))
 
-    const matchBranch = branchFilter ? sub.userBranch === branchFilter : true
+    const matchBranch = branchFilter
+      ? (sub.userBranch || '').toLowerCase().includes(branchFilter.trim().toLowerCase())
+      : true
 
     const subBatch = sub.batch || sub.userBatchGroup
     const matchBatch =
@@ -77,21 +92,51 @@ function TeacherDashboard({
 
     return matchSearch && matchBranch && matchBatch
   }).sort((first, second) => {
-    const firstId = String(first.userId || '').trim()
-    const secondId = String(second.userId || '').trim()
+    const firstValue = sortBy === 'id' ? first.userId : sortBy === 'marks' ? first.marks : getTotalMarksForSort(first)
+    const secondValue = sortBy === 'id' ? second.userId : sortBy === 'marks' ? second.marks : getTotalMarksForSort(second)
+    const firstText = String(firstValue ?? '').trim()
+    const secondText = String(secondValue ?? '').trim()
 
-    if (!firstId && !secondId) return 0
-    if (!firstId) return 1
-    if (!secondId) return -1
+    if (sortBy !== 'id') {
+      const firstNumber = Number(firstText)
+      const secondNumber = Number(secondText)
+      const firstHasMarks = firstText !== '' && Number.isFinite(firstNumber)
+      const secondHasMarks = secondText !== '' && Number.isFinite(secondNumber)
 
-    const firstNumber = Number(firstId)
-    const secondNumber = Number(secondId)
-    if (Number.isFinite(firstNumber) && Number.isFinite(secondNumber)) {
-      return firstNumber - secondNumber
+      if (!firstHasMarks && !secondHasMarks) return 0
+      if (!firstHasMarks) return 1
+      if (!secondHasMarks) return -1
+      return sortDirection === 'asc' ? firstNumber - secondNumber : secondNumber - firstNumber
     }
 
-    return firstId.localeCompare(secondId, undefined, { numeric: true, sensitivity: 'base' })
+    if (!firstText && !secondText) return 0
+    if (!firstText) return 1
+    if (!secondText) return -1
+
+    const firstNumber = Number(firstText)
+    const secondNumber = Number(secondText)
+    const comparison = Number.isFinite(firstNumber) && Number.isFinite(secondNumber)
+      ? firstNumber - secondNumber
+      : firstText.localeCompare(secondText, undefined, { numeric: true, sensitivity: 'base' })
+    return sortDirection === 'asc' ? comparison : -comparison
   })
+
+  const handleSort = (field) => {
+    if (sortBy === field) {
+      setSortDirection((direction) => direction === 'asc' ? 'desc' : 'asc')
+      return
+    }
+
+    setSortBy(field)
+    setSortDirection(field === 'id' ? 'asc' : 'desc')
+  }
+
+  const sortIcon = (field) => {
+    if (sortBy !== field) return <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
+    return sortDirection === 'asc'
+      ? <ArrowUp className="h-3.5 w-3.5 text-emerald-700" />
+      : <ArrowDown className="h-3.5 w-3.5 text-emerald-700" />
+  }
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredSubmissions.length) {
@@ -215,14 +260,18 @@ function TeacherDashboard({
 
         {/* Branch Filter */}
         <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center">
-          <select
-            className="w-full px-4 py-3 bg-transparent text-sm text-slate-700 focus:outline-none appearance-none cursor-pointer font-semibold"
+          <input
+            type="text"
+            list="submission-branches"
+            placeholder="শাখা লিখে খুঁজুন..."
+            aria-label="Filter submissions by branch"
+            className="w-full px-4 py-3 bg-transparent text-sm text-slate-700 focus:outline-none font-semibold placeholder:text-slate-400"
             value={branchFilter}
             onChange={(e) => setBranchFilter(e.target.value)}
-          >
-            <option value="">সকল শাখা (All Branches)</option>
-            {branches.map((b, i) => <option key={i} value={b}>{b}</option>)}
-          </select>
+          />
+          <datalist id="submission-branches">
+            {branches.map((branch, index) => <option key={index} value={branch} />)}
+          </datalist>
         </div>
 
         {/* Dynamic Database Report Batch Selector */}
@@ -288,16 +337,28 @@ function TeacherDashboard({
                     onChange={toggleSelectAll}
                   />
                 </th>}
-                <th className="py-4 px-4">আইডি</th>
+                <th className="py-4 px-4" aria-sort={sortBy === 'id' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button type="button" onClick={() => handleSort('id')} className="inline-flex items-center gap-1.5" aria-label={`Sort by ID ${sortBy === 'id' && sortDirection === 'asc' ? 'descending' : 'ascending'}`}>
+                    আইডি {sortIcon('id')}
+                  </button>
+                </th>
                 <th className="py-4 px-4">নাম</th>
                 <th className="py-4 px-4">শাখা</th>
                 <th className="py-4 px-4">ব্যাচ</th>
                 <th className="py-4 px-4">জমাদানের সময়</th>
                 {canViewMarks && <>
                   <th className="py-4 px-4 text-center">মূল্যায়ন অবস্থা</th>
-                  <th className="py-4 px-4 text-center">প্রাপ্ত নম্বর (১০)</th>
+                  <th className="py-4 px-4 text-center" aria-sort={sortBy === 'marks' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button type="button" onClick={() => handleSort('marks')} className="inline-flex items-center justify-center gap-1.5" aria-label={`Sort by marks ${sortBy === 'marks' && sortDirection === 'desc' ? 'ascending' : 'descending'}`}>
+                      প্রাপ্ত নম্বর (১০) {sortIcon('marks')}
+                    </button>
+                  </th>
                   <th className="py-4 px-4 text-center">ভাইভা (৫)</th>
-                  <th className="py-4 px-4 text-center">মোট নম্বর (১৫)</th>
+                  <th className="py-4 px-4 text-center" aria-sort={sortBy === 'totalMarks' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button type="button" onClick={() => handleSort('totalMarks')} className="inline-flex items-center justify-center gap-1.5" aria-label={`Sort by total marks ${sortBy === 'totalMarks' && sortDirection === 'desc' ? 'ascending' : 'descending'}`}>
+                      মোট নম্বর (১৫) {sortIcon('totalMarks')}
+                    </button>
+                  </th>
                 </>}
                 {(canViewMarks || canGrade) && <th className="py-4 px-6 text-right">অ্যাকশন</th>}
               </tr>

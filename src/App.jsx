@@ -1557,7 +1557,7 @@ export default function App() {
                 onChange={handleStudentFormChange}
                 onSubmit={handleStudentSubmit}
                 submitStatus={submitStatus}
-                gradedMarks={studentSubmission?.status?.toLowerCase() === 'graded' ? studentSubmission.marks : null}
+                writtenMarks={studentSubmission?.marks ?? null}
                 isExamActive={isExamActive}
                 activeBatches={studentBatchOptions}
                 questionSetName={selectedQuestionSetName}

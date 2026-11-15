@@ -1,2 +1,5 @@
 [functions.passkey-auth]
 verify_jwt = false
+
+[functions.admin-user-management]
+import_map = "./functions/deno.json"

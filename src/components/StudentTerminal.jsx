@@ -5,7 +5,7 @@ function StudentTerminal({
   onChange,
   onSubmit,
   submitStatus,
-  gradedMarks,
+  writtenMarks,
   isExamActive,
   isSheetyReachable,
   checkingConnection,
@@ -17,6 +17,8 @@ function StudentTerminal({
   isQuestionSetAssigned = false,
   activeBatches = [],
 }) {
+  const canShowWrittenMarks = !isExamActive && writtenMarks !== null && writtenMarks !== undefined
+
   if (checkingConnection) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[55vh] text-center space-y-4">
@@ -60,17 +62,25 @@ function StudentTerminal({
         <h2 className="text-3xl font-extrabold text-emerald-800">আলহামদুলিল্লাহ!</h2>
         <p className="text-slate-600 font-medium mt-3 text-lg">আপনার উত্তরপত্র সফলভাবে জমা নেওয়া হয়েছে।</p>
         <div className="mt-8 pt-6 border-t border-slate-100">
-          
-            <p className="text-sm text-slate-500">আপনার অটো-গ্রেডিং সম্পন্ন হয়েছে। শিক্ষক খাতা মূল্যায়ন শেষে আপনার ফলাফল প্রকাশ করবেন।</p>
-          
+          <p className="text-sm text-slate-500">
+            {isExamActive
+              ? 'পরীক্ষা চলমান আছে। পরীক্ষা বন্ধ হলে আপনার লিখিত নম্বর দেখতে পারবেন।'
+              : 'আপনার অটো-গ্রেডিং সম্পন্ন হয়েছে। নিচে আপনার লিখিত নম্বর দেখুন।'}
+          </p>
         </div>
+        {canShowWrittenMarks && (
+          <div className="mt-5 rounded-2xl bg-emerald-50 px-5 py-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Written Marks</p>
+            <p className="mt-1 text-2xl font-black text-emerald-800">{writtenMarks} / 10</p>
+          </div>
+        )}
       </div>
     )
   }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-slide-in">
-      {gradedMarks === null || gradedMarks === undefined ? (
+      {!canShowWrittenMarks ? (
         <div className="bg-gradient-to-r from-[#1B4D1A] to-emerald-900 rounded-[2rem] p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h2 className="text-2xl md:text-3xl font-black">তাজবিদ মূল্যায়ন পরীক্ষা</h2>
@@ -85,14 +95,14 @@ function StudentTerminal({
         </div>
       ) : null}
 
-      {gradedMarks !== null && gradedMarks !== undefined && (
+      {canShowWrittenMarks && (
         <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm px-6 py-5 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-black text-slate-900">আপনার লিখিত ফলাফল</h2>
             <p className="mt-1 text-xs font-bold uppercase tracking-wider text-emerald-700">Written Marks</p>
             <p className="mt-1 text-sm text-slate-500">আপনার লিখিত অংশের অটো-গণনাকৃত নম্বর</p>
           </div>
-          <p className="text-2xl font-black text-emerald-800 whitespace-nowrap">{gradedMarks} / 10</p>
+          <p className="text-2xl font-black text-emerald-800 whitespace-nowrap">{writtenMarks} / 10</p>
         </div>
       )}
 
@@ -257,7 +267,7 @@ function StudentTerminal({
             </button>
           </div>
         </form>
-      ) : gradedMarks !== null && gradedMarks !== undefined ? null : (
+      ) : canShowWrittenMarks ? null : (
         <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm">
           <Clock className="h-16 w-16 text-amber-500 mx-auto mb-4" />
           <h3 className="text-2xl font-bold text-slate-800">পরীক্ষা বর্তমানে বন্ধ রয়েছে</h3>

@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   ChevronDown,
   KeyRound,
-  Layers3,
   LogOut,
   PhoneCall,
   RefreshCw,
@@ -35,8 +34,18 @@ const getFunctionErrorMessage = async (error) => {
   return error?.message || "Unknown function error.";
 };
 
+const getUserBatches = (user) => {
+  const batches = Array.isArray(user.batch)
+    ? user.batch
+    : user.batch
+      ? [user.batch]
+      : [];
+  return batches.filter((batch) => typeof batch === "string" && batch.trim());
+};
+
 function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = [], onToggleBatchStatus }) {
   const [users, setUsers] = useState([]);
+  const [activeView, setActiveView] = useState("pending");
   const [selectedIds, setSelectedIds] = useState([]);
   const [passwords, setPasswords] = useState({});
   const [loading, setLoading] = useState(true);
@@ -137,28 +146,38 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
         : [...new Set([...current, ...ids])];
     });
 
-  const approveSelected = async () => {
+  const approveUsers = async (userIds) => {
     const pendingIds = users
-      .filter((user) => selectedIds.includes(user.id) && !user.approved)
+      .filter((user) => userIds.includes(user.id) && !user.approved)
       .map((user) => user.id);
-    if (!pendingIds.length)
+    if (!pendingIds.length) {
       return onNotify("Approve করার জন্য pending user নির্বাচন করুন।", "error");
-    setWorking(true);
-    const { data, error } = await supabase.functions.invoke(
-      "admin-user-management",
-      { body: { action: "approve-users", userIds: pendingIds } },
-    );
-    if (error || data?.error)
-      onNotify(
-        `User approve করা যায়নি: ${error?.message || data.error}`,
-        "error",
-      );
-    else {
-      onNotify(`${pendingIds.length}টি user approve করা হয়েছে।`, "success");
-      await loadUsers();
     }
-    setWorking(false);
+
+    setWorking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "admin-user-management",
+        { body: { action: "approve-users", userIds: pendingIds } },
+      );
+      if (error || data?.error) {
+        onNotify(
+          `User approve করা যায়নি: ${error?.message || data.error}`,
+          "error",
+        );
+      } else {
+        onNotify(`${pendingIds.length}টি user approve করা হয়েছে।`, "success");
+        await loadUsers();
+      }
+    } catch (error) {
+      console.error("Failed to approve users:", error);
+      onNotify(`User approve করা যায়নি: ${error.message || "Unknown error."}`, "error");
+    } finally {
+      setWorking(false);
+    }
   };
+
+  const approveSelected = () => approveUsers(selectedIds);
 
   const changePassword = async (userId) => {
     const password = passwords[userId] || "";
@@ -243,22 +262,25 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
   const assignBatch = async () => {
     const batch = batchToAssign.trim();
     if (!batch) return onNotify("একটি batch name লিখুন।", "error");
-    if (!selectedIds.length) return onNotify("Batch assign করার জন্য user নির্বাচন করুন।", "error");
+    const selectedStudentIds = selectedIds.filter((id) =>
+      users.some((user) => user.id === id && user.role === "student"),
+    );
+    if (!selectedStudentIds.length) return onNotify("Batch assign করার জন্য student নির্বাচন করুন।", "error");
 
     setWorking(true);
     const { data, error } = await supabase.functions.invoke(
       "admin-user-management",
-      { body: { action: "assign-batch", userIds: selectedIds, batch } },
+      { body: { action: "assign-batch", userIds: selectedStudentIds, batch } },
     );
     if (error || data?.error) {
       onNotify(`Batch assign করা যায়নি: ${error?.message || data.error}`, "error");
     } else {
-      setUsers((current) => current.map((user) => selectedIds.includes(user.id)
+      setUsers((current) => current.map((user) => selectedStudentIds.includes(user.id)
         ? { ...user, batch: Array.from(new Set([...(Array.isArray(user.batch) ? user.batch : user.batch ? [user.batch] : []), batch])) }
         : user));
       setBatchToAssign("");
       setSelectedIds([]);
-      onNotify(`${selectedIds.length}টি user-কে ${batch} batch assign করা হয়েছে।`, "success");
+      onNotify(`${selectedStudentIds.length}টি student-কে ${batch} batch assign করা হয়েছে।`, "success");
     }
     setWorking(false);
   };
@@ -318,6 +340,19 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
               {user.phone}
             </a>
           )}
+          {user.role === "student" && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {getUserBatches(user).length ? getUserBatches(user).map((batch) => (
+                <span key={batch} className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700">
+                  {batch}
+                </span>
+              )) : (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                  Unassigned
+                </span>
+              )}
+            </div>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-500">
             {user.sessions?.length ? (
               <>
@@ -364,11 +399,27 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
 
       {/* Right section: Password Input + Action Buttons */}
       <div className="flex items-center gap-2 w-full sm:w-auto">
-        <span
-          className={`text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap shrink-0 ${user.archived ? "bg-slate-100 text-slate-600" : user.approved ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
-        >
-          {user.archived ? "Archived" : user.approved ? "Approved" : "Pending"}
-        </span>
+        {user.approved || user.archived ? (
+          <span
+            className={`text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap shrink-0 ${user.archived ? "bg-slate-100 text-slate-600" : "bg-emerald-50 text-emerald-700"}`}
+          >
+            {user.archived ? "Archived" : "Approved"}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              approveUsers([user.id]);
+            }}
+            disabled={working}
+            className="flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+            aria-label={`Approve ${user.email}`}
+          >
+            <Check className="h-3.5 w-3.5" />
+            Approve
+          </button>
+        )}
         <div className="relative flex-1 sm:w-48" onClick={(event) => event.stopPropagation()}>
           <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
@@ -513,11 +564,7 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
     const batches = Array.from(
       new Set(
         roleUsers.flatMap((user) => {
-          const userBatches = Array.isArray(user.batch)
-            ? user.batch
-            : user.batch
-              ? [user.batch]
-              : [];
+          const userBatches = getUserBatches(user);
           return userBatches.length ? userBatches : ["Unassigned"];
         }),
       ),
@@ -558,17 +605,13 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
           {batches.map((batch) => {
             const batchUsers = roleUsers.filter((user) =>
               batch === "Unassigned"
-                ? !user.batch ||
-                  (Array.isArray(user.batch) && user.batch.length === 0)
-                : (Array.isArray(user.batch)
-                    ? user.batch
-                    : [user.batch]
-                  ).includes(batch),
+                ? getUserBatches(user).length === 0
+                : getUserBatches(user).includes(batch),
             );
             const batchPendingIds = batchUsers
               .filter((user) => !user.approved)
               .map((user) => user.id);
-            const isExpanded = expandedBatches[batch] !== false;
+            const isExpanded = expandedBatches[batch] ?? batch === "Unassigned";
             return (
               <div
                 key={batch}
@@ -626,18 +669,71 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
     );
   };
 
-  const allIds = visibleUsers.map((user) => user.id);
   const studentUsers = visibleUsers.filter((user) => user.role === "student");
   const pendingUsers = visibleUsers.filter((user) => !user.approved);
   const approvedUsers = visibleUsers.filter((user) => user.approved);
+  const unassignedStudents = studentUsers.filter((user) => getUserBatches(user).length === 0);
+  const pendingStudents = pendingUsers.filter((user) => user.role === "student");
+  const pendingStaff = pendingUsers.filter((user) => ["teacher", "admin"].includes(user.role));
+  const otherPendingUsers = pendingUsers.filter((user) => !["student", "teacher", "admin"].includes(user.role));
+  const pendingStudentBatches = new Map();
+  for (const user of pendingStudents.filter((student) => getUserBatches(student).length > 0)) {
+    const primaryBatch = [...getUserBatches(user)].sort((first, second) => first.localeCompare(second))[0];
+    pendingStudentBatches.set(primaryBatch, [...(pendingStudentBatches.get(primaryBatch) || []), user]);
+  }
+  const selectableUsers = activeView === "pending" ? pendingUsers : visibleUsers;
+  const allIds = selectableUsers.map((user) => user.id);
+  const pendingSelectedCount = users.filter((user) =>
+    selectedIds.includes(user.id) && !user.approved,
+  ).length;
+  const selectedStudentCount = users.filter((user) =>
+    selectedIds.includes(user.id) && user.role === "student",
+  ).length;
+  const renderQueueGroup = (title, groupUsers, description) => (
+    <section key={title} className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-black text-slate-900">{title}</h3>
+          {description && <p className="mt-1 text-xs text-slate-500">{description}</p>}
+        </div>
+        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+          {groupUsers.length} pending
+        </span>
+      </div>
+      <div className="space-y-2">{groupUsers.map(renderUser)}</div>
+    </section>
+  );
+  const renderApprovalQueue = () => {
+    if (!pendingUsers.length) {
+      return (
+        <div className="rounded-3xl border border-dashed border-emerald-200 bg-emerald-50 p-8 text-center">
+          <CheckCircle2 className="mx-auto h-9 w-9 text-emerald-600" />
+          <h3 className="mt-3 text-lg font-black text-emerald-950">All caught up</h3>
+          <p className="mt-1 text-sm text-emerald-800">There are no pending accounts matching these filters.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-7">
+        {unassignedStudents.some((user) => !user.approved) && renderQueueGroup(
+          "Unassigned students",
+          unassignedStudents.filter((user) => !user.approved),
+          "These students have no batch yet. Review their details and assign a batch when appropriate.",
+        )}
+        {Array.from(pendingStudentBatches.entries())
+          .sort(([first], [second]) => first.localeCompare(second))
+          .map(([batch, batchUsers]) => renderQueueGroup(`Students · ${batch}`, batchUsers))}
+        {pendingStaff.length > 0 && renderQueueGroup("Teachers & admins", pendingStaff)}
+        {otherPendingUsers.length > 0 && renderQueueGroup("Other accounts", otherPendingUsers)}
+      </div>
+    );
+  };
+  const unassignedCount = unassignedStudents.length;
   const batchStats = Array.from(
     new Set(
       studentUsers.flatMap((user) => {
-        const batches = Array.isArray(user.batch)
-          ? user.batch
-          : user.batch
-            ? [user.batch]
-            : [];
+        const batches = getUserBatches(user);
         return batches.length ? batches : ["Unassigned"];
       }),
     ),
@@ -646,14 +742,15 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
       batch,
       count: studentUsers.filter((user) =>
         batch === "Unassigned"
-          ? !user.batch ||
-            (Array.isArray(user.batch) && user.batch.length === 0)
-          : (Array.isArray(user.batch) ? user.batch : [user.batch]).includes(
-              batch,
-            ),
+          ? getUserBatches(user).length === 0
+          : getUserBatches(user).includes(batch),
       ).length,
     }))
-    .sort((first, second) => first.batch.localeCompare(second.batch));
+    .sort((first, second) => first.batch === "Unassigned"
+      ? -1
+      : second.batch === "Unassigned"
+        ? 1
+        : first.batch.localeCompare(second.batch));
   return (
     <section className="space-y-6 animate-slide-in">
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/70 shadow-sm">
@@ -667,7 +764,7 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
                 User management
               </h2>
               <p className="text-sm text-slate-500 mt-1">
-                Role ও approval status অনুযায়ী account পরিচালনা করুন। Student exam ও assignment status তাদের linked submission থেকে স্বয়ংক্রিয়ভাবে হিসাব করা হয়। Active session IPs portal activity থেকে সংগ্রহ হয়; user list refresh-এ 30 দিনের পুরোনো records পরিষ্কার হয়।
+                Review pending accounts first, then manage students by batch or update staff access.
               </p>
             </div>
           </div>
@@ -716,15 +813,36 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
           </div>
           <div className="rounded-2xl bg-sky-50 border border-sky-100 p-4">
             <div className="flex items-center justify-between text-sky-700">
-              <span className="text-xs font-bold uppercase tracking-wide">Batches</span>
-              <Layers3 className="h-4 w-4" />
+              <span className="text-xs font-bold uppercase tracking-wide">Unassigned students</span>
+              <UserRound className="h-4 w-4" />
             </div>
-            <p className="mt-2 text-2xl font-black text-sky-900">{batchStats.length}</p>
+            <p className="mt-2 text-2xl font-black text-sky-900">{unassignedCount}</p>
           </div>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2" aria-label="User management views">
+          {[
+            { id: "pending", label: "Approval queue", count: pendingUsers.length },
+            { id: "students", label: "Students", count: studentUsers.length },
+            { id: "staff", label: "Teachers & admins", count: visibleUsers.filter((user) => ["teacher", "admin"].includes(user.role)).length },
+            { id: "all", label: "All accounts", count: visibleUsers.length },
+          ].map(({ id, label, count }) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={activeView === id}
+              onClick={() => setActiveView(id)}
+              className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${activeView === id ? "bg-emerald-700 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+            >
+              {label}
+              <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${activeView === id ? "bg-white/20 text-white" : "bg-white text-slate-600"}`}>
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {batchStats.length ? batchStats.map(({ batch, count }) => (
-            <span key={batch} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">
+            <span key={batch} className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${batch === "Unassigned" ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-700"}`}>
               <span className="h-2 w-2 rounded-full bg-emerald-600" />
               {batch}
               <span className="text-slate-400">{count}</span>
@@ -768,8 +886,8 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
               <option value="">Select active batch</option>
               {activeBatches.map((batch) => <option key={batch} value={batch}>{batch}</option>)}
             </select>
-            <button type="button" onClick={assignBatch} disabled={working || !selectedIds.length || !batchToAssign} className="px-3 py-2.5 bg-sky-700 text-white rounded-xl text-xs font-bold whitespace-nowrap disabled:opacity-50">
-              Assign batch
+            <button type="button" onClick={assignBatch} disabled={working || !selectedStudentCount || !batchToAssign} className="px-3 py-2.5 bg-sky-700 text-white rounded-xl text-xs font-bold whitespace-nowrap disabled:opacity-50">
+              Assign batch ({selectedStudentCount})
             </button>
           </div>
           {!activeBatches.length && <p className="text-xs text-amber-700">No active batches are configured. Add one in Exam Dashboard settings first.</p>}
@@ -783,15 +901,15 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
               onChange={() => toggleIds(allIds)}
               className="h-4 w-4 accent-emerald-700"
             />{" "}
-            সব visible user
+            {activeView === "pending" ? "সব pending user" : "সব visible user"}
           </label>
           <button
             type="button"
             onClick={approveSelected}
-            disabled={working || !selectedIds.length}
+            disabled={working || !pendingSelectedCount}
             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-700 text-white rounded-xl text-xs font-bold disabled:opacity-50"
           >
-            <Check className="h-4 w-4" /> Approve ({selectedIds.length})
+            <Check className="h-4 w-4" /> Approve selected ({pendingSelectedCount})
           </button>
         </div>
         <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
@@ -802,10 +920,15 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
       {loading ? (
         <p className="text-sm text-slate-500">User list লোড হচ্ছে...</p>
       ) : (
-        <div className="space-y-8">
-          {renderRole("staff", "Teachers & admins")}
-          {renderRole("student", "Students")}
-        </div>
+        activeView === "pending" ? renderApprovalQueue()
+          : activeView === "students" ? renderRole("student", "Students")
+            : activeView === "staff" ? renderRole("staff", "Teachers & admins")
+              : (
+                <div className="space-y-8">
+                  {renderRole("staff", "Teachers & admins")}
+                  {renderRole("student", "Students")}
+                </div>
+              )
       )}
       {selectedUser && createPortal(
         <div className="fixed inset-0 z-[100] flex min-h-screen items-center justify-center overflow-y-auto bg-slate-950/50 p-4" onClick={() => setSelectedUser(null)}>

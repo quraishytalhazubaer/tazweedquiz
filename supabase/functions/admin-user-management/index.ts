@@ -63,6 +63,10 @@ const fetchAllRows = async <T>(createQuery: () => PagedQuery<T>) => {
   }
 }
 
+const chunkItems = <T>(items: T[], size: number) =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
+    items.slice(index * size, (index + 1) * size))
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -281,17 +285,29 @@ Deno.serve(async (request) => {
         .lt('last_seen_at', staleSessionsBefore)
       if (cleanupError) return json({ error: cleanupError.message }, 400)
 
-      const { data, error } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 })
-      if (error) return json({ error: error.message }, 400)
+      const users = []
+      for (let page = 1; ; page += 1) {
+        const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 1000 })
+        if (error) return json({ error: error.message }, 400)
+        users.push(...data.users)
+        if (data.users.length < 1000) break
+      }
 
-      const userIds = data.users.map((user) => user.id)
-      const { data: profiles, error: profileError } = await adminClient.from('profiles').select('id, role, teacher_permissions, full_name, employee_id, branch, designation, phone, approved, archived, batch').in('id', userIds)
+      const userIds = users.map((user) => user.id)
+      const userIdChunks = chunkItems(userIds, 100)
+      const profileResults = await Promise.all(userIdChunks.map((ids) =>
+        adminClient
+          .from('profiles')
+          .select('id, role, teacher_permissions, full_name, employee_id, branch, designation, phone, approved, archived, batch')
+          .in('id', ids)))
+      const profileError = profileResults.find((result) => result.error)?.error
       if (profileError) return json({ error: profileError.message }, 400)
+      const profiles = profileResults.flatMap((result) => result.data || [])
       const studentProfiles = (profiles || []).filter((profile) => profile.role === 'student')
       const studentProfileIds = studentProfiles.map((profile) => profile.id)
-      const studentIdChunks = Array.from({ length: Math.ceil(studentProfileIds.length / 100) }, (_, index) =>
-        studentProfileIds.slice(index * 100, (index + 1) * 100))
-      const [examSubmissionResults, assignmentSubmissionResults, attendanceResults, assignmentTargetResult] = await Promise.all([
+      const studentIdChunks = chunkItems(studentProfileIds, 100)
+      const activeSince = new Date(Date.now() - 3 * 60 * 1000).toISOString()
+      const [examSubmissionResults, assignmentSubmissionResults, attendanceResults, assignmentTargetResult, sessionResults] = await Promise.all([
         Promise.all(studentIdChunks.map((ids) =>
           fetchAllRows(() => adminClient.from('submissions').select('profile_id').in('profile_id', ids)))),
         Promise.all(studentIdChunks.map((ids) =>
@@ -299,17 +315,27 @@ Deno.serve(async (request) => {
         Promise.all(studentIdChunks.map((ids) =>
           fetchAllRows(() => adminClient.from('attendance_records').select('profile_id, attendance_date').in('profile_id', ids)))),
         fetchAllRows(() => adminClient.from('assignment_batches').select('assignment_id, batch')),
+        Promise.all(userIdChunks.map((ids) =>
+          fetchAllRows(() => adminClient
+            .from('user_sessions')
+            .select('user_id, session_id, ip_address, created_at, last_seen_at')
+            .in('user_id', ids)
+            .is('revoked_at', null)
+            .gte('last_seen_at', activeSince)
+            .order('last_seen_at', { ascending: false })))),
       ])
       const queryError = [
         ...examSubmissionResults,
         ...assignmentSubmissionResults,
         ...attendanceResults,
         assignmentTargetResult,
+        ...sessionResults,
       ].find((result) => result.error)?.error
       if (queryError) return json({ error: queryError.message }, 400)
       const examSubmissions = examSubmissionResults.flatMap((result) => result.data || [])
       const assignmentSubmissions = assignmentSubmissionResults.flatMap((result) => result.data || [])
       const attendanceRecords = attendanceResults.flatMap((result) => result.data || [])
+      const sessions = sessionResults.flatMap((result) => result.data || [])
       const attendedExamCounts = new Map<string, number>()
       for (const submission of examSubmissions) {
         attendedExamCounts.set(submission.profile_id, (attendedExamCounts.get(submission.profile_id) || 0) + 1)
@@ -337,21 +363,12 @@ Deno.serve(async (request) => {
           assignmentSubmittedCount: submittedCount,
         }]
       }))
-      const activeSince = new Date(Date.now() - 3 * 60 * 1000).toISOString()
-      const { data: sessions, error: sessionsError } = await adminClient
-        .from('user_sessions')
-        .select('user_id, session_id, ip_address, created_at, last_seen_at')
-        .in('user_id', userIds)
-        .is('revoked_at', null)
-        .gte('last_seen_at', activeSince)
-        .order('last_seen_at', { ascending: false })
-      if (sessionsError) return json({ error: sessionsError.message }, 400)
-      const profileById = new Map((profiles || []).map((profile) => [profile.id, profile]))
+      const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
       const sessionsByUser = new Map<string, typeof sessions>()
       for (const session of sessions || []) {
         sessionsByUser.set(session.user_id, [...(sessionsByUser.get(session.user_id) || []), session])
       }
-      return json({ users: data.users.map((user) => ({
+      return json({ users: users.map((user) => ({
         id: user.id,
         email: user.email,
         created_at: user.created_at,
