@@ -59,6 +59,11 @@ const generateAttendanceCode = (attendanceDate = getLocalDateKey()) => {
   return `${attendanceDate.replaceAll('-', '')}-${time}-${random}`;
 };
 
+const isMissingGenderColumnError = (error) => (
+  ['42703', 'PGRST204'].includes(error?.code)
+  && error.message?.toLowerCase().includes('gender')
+);
+
 // ============================================================================
 // 2. APP HELPERS
 // ============================================================================
@@ -147,6 +152,7 @@ export default function App() {
     employeeId: '',
     designation: '',
     branch: '',
+    gender: '',
     phone: '',
     batch: [],
   });
@@ -524,6 +530,7 @@ export default function App() {
         employeeId: data.employee_id || data.employeeId || metadata.employee_id || '',
         designation: data.designation || metadata.designation || '',
         branch: data.branch || data.user_branch || metadata.branch || '',
+        gender: data.gender || '',
         phone: data.phone || metadata.phone || '',
         batch: Array.isArray(data.batch) ? data.batch : data.batch ? [data.batch] : [],
       };
@@ -652,18 +659,26 @@ export default function App() {
       const canViewSubmissionDetails = hasTeacherPermission(user, 'exam')
         || hasTeacherPermission(user, 'marks')
         || hasTeacherPermission(user, 'grading');
-      const submissionColumns = [
-        ...(canViewSubmissionDetails
-          ? ['id, profile_id, user_name, user_id, user_branch, designation, batch, date, timestamp']
-          : ['batch']),
-        ...(hasTeacherPermission(user, 'marks') ? ['status, marks, viva_marks, total_marks'] : []),
-        ...(hasTeacherPermission(user, 'grading') || hasTeacherPermission(user, 'marks') ? ['answers'] : []),
-        ...(canViewSubmissionDetails ? ['profile:profiles(full_name, employee_id, branch, designation, batch)'] : []),
-      ].join(', ');
-      const { data, error } = await supabase
-        .from('submissions')
-        .select(submissionColumns)
-        .order('id', { ascending: false });
+      const loadSubmissions = (includeGender) => {
+        const submissionColumns = [
+          ...(canViewSubmissionDetails
+            ? [`id, profile_id, user_name, user_id, user_branch, designation${includeGender ? ', gender' : ''}, batch, date, timestamp`]
+            : ['batch']),
+          ...(hasTeacherPermission(user, 'marks') ? ['status, marks, viva_marks, total_marks'] : []),
+          ...(hasTeacherPermission(user, 'grading') || hasTeacherPermission(user, 'marks') ? ['answers'] : []),
+          ...(canViewSubmissionDetails
+            ? [`profile:profiles(full_name, employee_id, branch, designation, batch${includeGender ? ', gender' : ''})`]
+            : []),
+        ].join(', ');
+        return supabase
+          .from('submissions')
+          .select(submissionColumns)
+          .order('id', { ascending: false });
+      };
+      let { data, error } = await loadSubmissions(true);
+      if (isMissingGenderColumnError(error)) {
+        ({ data, error } = await loadSubmissions(false));
+      }
 
       if (error) throw error;
 
@@ -675,6 +690,7 @@ export default function App() {
         userId: row.profile?.employee_id || row.user_id,
         userBranch: row.profile?.branch || row.user_branch,
         designation: row.profile?.designation || row.designation,
+        gender: row.profile?.gender || row.gender || '',
         batch: row.batch,
         status: row.status,
         marks: row.marks,
@@ -908,6 +924,7 @@ export default function App() {
           user_branch: formData.userBranch,
           designation: formData.designation,
           profile_id: user.user.id,
+          gender: studentProfile.gender || null,
           batch: formData.batch,
           marks: score,
           answers: answersPayload,
@@ -1319,6 +1336,7 @@ export default function App() {
           employee_id: profile.employeeId,
           designation: profile.designation,
           branch: profile.branch,
+          gender: profile.gender || null,
           phone: profile.phone,
           batch: profileBatches,
         })

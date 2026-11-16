@@ -56,6 +56,7 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
   const [expandedBatches, setExpandedBatches] = useState({});
   const [selectedUser, setSelectedUser] = useState(null);
   const [employeeIdDraft, setEmployeeIdDraft] = useState("");
+  const [genderDraft, setGenderDraft] = useState("");
   const [accessRole, setAccessRole] = useState("teacher");
   const [accessPermissions, setAccessPermissions] = useState({});
 
@@ -90,6 +91,7 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
   const openUser = (user) => {
     setSelectedUser(user);
     setEmployeeIdDraft(user.employee_id || "");
+    setGenderDraft(user.gender || "");
     setAccessRole(user.role);
     setAccessPermissions(normalizeTeacherPermissions(user.permissions));
   };
@@ -136,6 +138,30 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
       onNotify("Student ID সফলভাবে পরিবর্তন করা হয়েছে।", "success");
     }
     setWorking(false);
+  };
+
+  const changeGender = async () => {
+    setWorking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "admin-user-management",
+        { body: { action: "update-gender", userId: selectedUser.id, gender: genderDraft || null } },
+      );
+      if (error || data?.error) {
+        onNotify(`Gender পরিবর্তন করা যায়নি: ${error?.message || data.error}`, "error");
+        return;
+      }
+
+      const updatedUser = { ...selectedUser, gender: data.gender || "" };
+      setUsers((current) => current.map((user) => user.id === updatedUser.id ? updatedUser : user));
+      setSelectedUser(updatedUser);
+      onNotify("Gender সংরক্ষণ করা হয়েছে।", "success");
+    } catch (error) {
+      console.error("Failed to update user gender:", error);
+      onNotify(`Gender পরিবর্তন করা যায়নি: ${error.message || "Unknown error."}`, "error");
+    } finally {
+      setWorking(false);
+    }
   };
 
   const toggleIds = (ids) =>
@@ -970,6 +996,28 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
                   <button
                     type="button"
                     onClick={changeEmployeeId}
+                    disabled={working}
+                    className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>}
+              {selectedUser.role === "student" && <div className="rounded-2xl bg-slate-50 p-3">
+                <label htmlFor="student-gender" className="text-xs font-bold uppercase tracking-wide text-slate-400">Gender (Optional)</label>
+                <div className="mt-2 flex gap-2">
+                  <select
+                    id="student-gender"
+                    value={genderDraft}
+                    onChange={(event) => setGenderDraft(event.target.value)}
+                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800"
+                  >
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={changeGender}
                     disabled={working}
                     className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
                   >

@@ -100,7 +100,7 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions, 
       </div>
 
       <div className="bg-slate-900 text-white rounded-[2rem] p-6 md:p-8 shadow-md">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
           <div>
             <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">পরীক্ষার্থীর নাম</span>
             {isIdentityEditing ? (
@@ -153,7 +153,13 @@ function GradingWorkspace({ submission, onBack, onSaveMarks, saving, questions, 
               <p className="text-base font-semibold mt-0.5">{identityDraft.designation || '---'}</p>
             )}
           </div>
-          <div className="md:col-start-5 md:text-right">
+          <div>
+            <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">Gender</span>
+            <p className="text-base font-semibold mt-0.5">
+              {submission.gender === 'male' ? 'Male' : submission.gender === 'female' ? 'Female' : 'Not provided'}
+            </p>
+          </div>
+          <div className="md:col-start-6 md:text-right">
             <span className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase">অটো-গ্রেডেড স্কোর</span>
             <p className="text-lg font-extrabold mt-0.5 text-emerald-300">{autoGradedMarks} / 10</p>
           </div>

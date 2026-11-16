@@ -87,6 +87,19 @@ function ProfileEdit({ profile, onSave, saving, activeBatches = [] }) {
           </label>
 
           <label className="space-y-2">
+            <span className="text-xs font-bold text-slate-700">লিঙ্গ (Gender, optional)</span>
+            <select
+              required
+              value={draft.gender || ''}
+              onChange={(event) => updateField('gender', event.target.value)}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
+            >
+              <option value="male">পুরুষ (Male)</option>
+              <option value="female">নারী (Female)</option>
+            </select>
+          </label>
+
+          <label className="space-y-2">
             <span className="text-xs font-bold text-slate-700">ফোন নম্বর (Phone)</span>
             <input type="tel" value={draft.phone || ''} onChange={(event) => updateField('phone', event.target.value)} placeholder="01XXXXXXXXX" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold focus:outline-none focus:border-emerald-500" />
           </label>

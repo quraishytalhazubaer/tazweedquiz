@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, Download, FileText, Loader2, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
+import { Fragment, useState } from 'react'
+import { ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, ChevronDown, Download, FileText, Loader2, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
 import AttendancePanel from './AttendancePanel'
 import QuestionManagement from './QuestionManagement'
 
@@ -52,7 +52,14 @@ function TeacherDashboard({
 }) {
   const [sortBy, setSortBy] = useState('id')
   const [sortDirection, setSortDirection] = useState('asc')
+  const [collapsedGenderGroups, setCollapsedGenderGroups] = useState({})
   const branches = Array.from(new Set(submissions.map((sub) => sub.userBranch).filter(Boolean)))
+  const getGenderSortOrder = (gender) => gender === 'male' ? 0 : gender === 'female' ? 1 : 2
+  const getGenderLabel = (gender) => gender === 'male'
+    ? 'Male'
+    : gender === 'female'
+      ? 'Female'
+      : 'Not provided'
 
   const submissionBatches = Array.from(
     new Set(submissions.map((sub) => sub.batch || sub.userBatchGroup).filter(Boolean))
@@ -61,7 +68,7 @@ function TeacherDashboard({
   const allAvailableBatches = Array.from(
     new Set([...(activeBatches || []), ...submissionBatches].filter((batch) => batch && batch.trim() !== ''))
   )
-  const columnCount = 5 + (canViewMarks ? 5 : 0) + (canViewMarks || canGrade ? 1 : 0)
+  const columnCount = 7 + (canViewMarks ? 5 : 0) + (canViewMarks || canGrade ? 1 : 0)
 
   const getTotalMarksForSort = (submission) => {
     const writtenMarks = submission.marks !== undefined && submission.marks !== null
@@ -78,7 +85,8 @@ function TeacherDashboard({
     const matchSearch =
       (sub.userName || '').toLowerCase().includes(query) ||
       (sub.userId && sub.userId.toString().toLowerCase().includes(query)) ||
-      (sub.userBranch && sub.userBranch.toLowerCase().includes(query))
+      (sub.userBranch && sub.userBranch.toLowerCase().includes(query)) ||
+      getGenderLabel(sub.gender).toLowerCase().includes(query)
 
     const matchBranch = branchFilter
       ? (sub.userBranch || '').toLowerCase().includes(branchFilter.trim().toLowerCase())
@@ -92,6 +100,9 @@ function TeacherDashboard({
 
     return matchSearch && matchBranch && matchBatch
   }).sort((first, second) => {
+    const genderComparison = getGenderSortOrder(first.gender) - getGenderSortOrder(second.gender)
+    if (genderComparison !== 0) return genderComparison
+
     const firstValue = sortBy === 'id' ? first.userId : sortBy === 'marks' ? first.marks : getTotalMarksForSort(first)
     const secondValue = sortBy === 'id' ? second.userId : sortBy === 'marks' ? second.marks : getTotalMarksForSort(second)
     const firstText = String(firstValue ?? '').trim()
@@ -120,6 +131,25 @@ function TeacherDashboard({
       : firstText.localeCompare(secondText, undefined, { numeric: true, sensitivity: 'base' })
     return sortDirection === 'asc' ? comparison : -comparison
   })
+  const serialNumbers = new Map(filteredSubmissions.map((submission, index) => (
+    [submission.id, index + 1]
+  )))
+  const genderGroups = [
+    { key: 'male', label: 'Male', order: 0 },
+    { key: 'female', label: 'Female', order: 1 },
+    { key: 'not-provided', label: 'Not provided', order: 2 },
+  ].map((group) => ({
+    ...group,
+    submissions: filteredSubmissions.filter((submission) => (
+      getGenderSortOrder(submission.gender) === group.order
+    )),
+  })).map((group) => ({
+    ...group,
+    vivaMarksEntered: group.submissions.filter((submission) => {
+      const vivaMarks = submission.viva_marks ?? submission.vivaMarks
+      return vivaMarks !== null && vivaMarks !== undefined && vivaMarks !== ''
+    }).length,
+  })).filter((group) => group.submissions.length > 0)
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -306,6 +336,33 @@ function TeacherDashboard({
           </button>
         </div>}
         </div>
+        {canViewMarks && genderGroups.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2" aria-label="Viva marks progress by gender">
+            {genderGroups.map((group) => {
+              const progress = Math.round((group.vivaMarksEntered / group.submissions.length) * 100)
+              return (
+                <div key={group.key} className="min-w-[140px] flex-1 rounded-xl border border-emerald-100 bg-white px-3 py-2 shadow-sm">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-bold text-slate-700">{group.label}</span>
+                    <span className="font-black text-emerald-800">
+                      {group.vivaMarksEntered}/{group.submissions.length}
+                    </span>
+                  </div>
+                  <div
+                    className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100"
+                    role="progressbar"
+                    aria-label={`${group.label} viva marks entered`}
+                    aria-valuemin={0}
+                    aria-valuemax={group.submissions.length}
+                    aria-valuenow={group.vivaMarksEntered}
+                  >
+                    <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Selection Notification Bar */}
@@ -337,12 +394,14 @@ function TeacherDashboard({
                     onChange={toggleSelectAll}
                   />
                 </th>}
+                <th className="py-4 px-4">SL</th>
                 <th className="py-4 px-4" aria-sort={sortBy === 'id' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                   <button type="button" onClick={() => handleSort('id')} className="inline-flex items-center gap-1.5" aria-label={`Sort by ID ${sortBy === 'id' && sortDirection === 'asc' ? 'descending' : 'ascending'}`}>
                     আইডি {sortIcon('id')}
                   </button>
                 </th>
                 <th className="py-4 px-4">নাম</th>
+                <th className="py-4 px-4">Gender</th>
                 <th className="py-4 px-4">শাখা</th>
                 <th className="py-4 px-4">ব্যাচ</th>
                 <th className="py-4 px-4">জমাদানের সময়</th>
@@ -378,7 +437,32 @@ function TeacherDashboard({
                   </td>
                 </tr>
               ) : (
-                filteredSubmissions.map((sub, idx) => {
+                genderGroups.map((group) => (
+                  <Fragment key={group.key}>
+                    <tr className="bg-emerald-50 border-y border-emerald-100">
+                      <td colSpan={columnCount} className="px-4 py-2 text-sm font-black text-emerald-900">
+                        <button
+                          type="button"
+                          aria-expanded={!collapsedGenderGroups[group.key]}
+                          aria-label={`${collapsedGenderGroups[group.key] ? 'Expand' : 'Collapse'} ${group.label} submissions`}
+                          onClick={() => setCollapsedGenderGroups((current) => ({
+                            ...current,
+                            [group.key]: !current[group.key],
+                          }))}
+                          className="flex w-full items-center gap-2 text-left"
+                        >
+                          <ChevronDown className={`h-4 w-4 transition-transform ${collapsedGenderGroups[group.key] ? '-rotate-90' : ''}`} />
+                          <span>{group.label}</span>
+                          <span className="text-xs font-bold text-emerald-700">({group.submissions.length})</span>
+                          {canViewMarks && (
+                            <span className="ml-auto text-xs font-bold text-emerald-800">
+                              Viva entered: {group.vivaMarksEntered}/{group.submissions.length}
+                            </span>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                    {!collapsedGenderGroups[group.key] && group.submissions.map((sub, idx) => {
                   const isChecked = selectedIds.includes(sub.id)
                   
                   // Existing Written Marks
@@ -406,10 +490,12 @@ function TeacherDashboard({
                           onChange={() => toggleSelectOne(sub.id)}
                         />
                       </td>}
+                      <td className="py-4 px-4 text-xs text-slate-500 font-mono">{serialNumbers.get(sub.id)}</td>
                       <td className="py-4 px-4 font-mono text-xs text-slate-600 font-bold">{sub.userId || '---'}</td>
                       <td className="py-4 px-4">
                         <div className="font-bold text-slate-950">{sub.userName}</div>
                       </td>
+                      <td className="py-4 px-4 text-slate-600 font-medium">{getGenderLabel(sub.gender)}</td>
                       <td className="py-4 px-4 text-slate-600 font-medium">{sub.userBranch || '---'}</td>
                       <td className="py-4 px-4 text-slate-600 font-medium">{sub.batch || sub.userBatchGroup || '---'}</td>
                       <td className="py-4 px-4 text-xs text-slate-500 font-sans">{sub.timestamp || sub.date || '---'}</td>
@@ -477,8 +563,10 @@ function TeacherDashboard({
                         </button>}
                       </td>}
                     </tr>
-                  )
-                })
+                    )
+                  })}
+                  </Fragment>
+                ))
               )}
             </tbody>
         </table>

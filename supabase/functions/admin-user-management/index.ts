@@ -298,7 +298,7 @@ Deno.serve(async (request) => {
       const profileResults = await Promise.all(userIdChunks.map((ids) =>
         adminClient
           .from('profiles')
-          .select('id, role, teacher_permissions, full_name, employee_id, branch, designation, phone, approved, archived, batch')
+          .select('id, role, teacher_permissions, full_name, employee_id, branch, designation, phone, approved, archived, batch, gender')
           .in('id', ids)))
       const profileError = profileResults.find((result) => result.error)?.error
       if (profileError) return json({ error: profileError.message }, 400)
@@ -379,6 +379,7 @@ Deno.serve(async (request) => {
         branch: profileById.get(user.id)?.branch || '',
         designation: profileById.get(user.id)?.designation || '',
         phone: profileById.get(user.id)?.phone || user.user_metadata?.phone || '',
+        gender: profileById.get(user.id)?.gender || null,
         approved: profileById.get(user.id)?.approved === true,
         archived: profileById.get(user.id)?.archived === true,
         batch: profileById.get(user.id)?.batch || [],
@@ -466,6 +467,29 @@ Deno.serve(async (request) => {
         .eq('id', payload.userId)
       if (error) return json({ error: error.message }, 400)
       return json({ success: true, employeeId })
+    }
+
+    if (payload.action === 'update-gender') {
+      if (
+        typeof payload.userId !== 'string'
+        || !(payload.gender === null || ['male', 'female'].includes(payload.gender))
+      ) {
+        return json({ error: 'A valid user ID and gender are required.' }, 400)
+      }
+      const { data: target, error: targetError } = await adminClient
+        .from('profiles')
+        .select('role')
+        .eq('id', payload.userId)
+        .single()
+      if (targetError || target?.role !== 'student') {
+        return json({ error: 'Gender can only be assigned to student accounts.' }, 400)
+      }
+      const { error } = await adminClient
+        .from('profiles')
+        .update({ gender: payload.gender })
+        .eq('id', payload.userId)
+      if (error) return json({ error: error.message }, 400)
+      return json({ success: true, gender: payload.gender })
     }
 
     if (payload.action === 'update-teacher-access') {
