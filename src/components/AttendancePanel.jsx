@@ -191,30 +191,30 @@ function AttendancePanel({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
           <button
             type="button"
             onClick={copyAttendanceCode}
             disabled={!attendance.code}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 disabled:opacity-50"
+            className="w-full justify-center text-center px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 disabled:opacity-50 sm:w-auto sm:justify-start sm:text-left"
           >
             <Copy className="h-4 w-4" /> Copy
           </button>
-          <label className="text-xs font-bold text-slate-500">
+          <label className="min-w-0 text-xs font-bold text-slate-500">
             Code date
             <input
               type="date"
               value={codeDate}
               onChange={(event) => setCodeDate(event.target.value)}
               disabled={!canEdit}
-              className="block mt-1 px-2 py-2 rounded-xl border border-amber-200 text-xs text-slate-700"
+              className="block w-full min-w-0 mt-1 px-2 py-2 rounded-xl border border-amber-200 text-xs text-slate-700"
             />
           </label>
           <button
             type="button"
             onClick={() => onRegenerateAttendance?.(codeDate)}
             disabled={!canEdit || !codeDate}
-            className="px-4 py-2.5 rounded-xl bg-amber-100 text-amber-900 font-bold text-xs flex items-center gap-2 disabled:opacity-50"
+            className="w-full justify-center text-center px-4 py-2.5 rounded-xl bg-amber-100 text-amber-900 font-bold text-xs flex items-center gap-2 disabled:opacity-50 sm:w-auto sm:justify-start sm:text-left"
           >
             <RefreshCw className="h-4 w-4" /> নতুন কোড
           </button>
@@ -222,7 +222,7 @@ function AttendancePanel({
             type="button"
             onClick={() => onToggleAttendance(!attendance.isActive)}
             disabled={!canEdit}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 disabled:opacity-50 ${attendance.isActive ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}`}
+            className={`w-full justify-center text-center px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 disabled:opacity-50 sm:w-auto sm:justify-start sm:text-left ${attendance.isActive ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}`}
           >
             <Power className="h-4 w-4" />
             {attendance.isActive ? 'হাজিরা বন্ধ করুন' : 'হাজিরা চালু করুন'}
@@ -271,23 +271,43 @@ function AttendancePanel({
             <h4 className="text-sm font-black text-slate-900">আজকের উপস্থিতি</h4>
             <p className="text-xs text-slate-500 mt-1">যেসব অংশগ্রহণকারী কোড দিয়ে হাজিরা দিয়েছেন</p>
           </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="text-xs font-bold text-slate-500">From
-              <input type="date" value={fromDate} max={toDate} onChange={(event) => setFromDate(event.target.value)} className="block mt-1 px-2 py-2 rounded-xl border border-slate-200 text-xs text-slate-700" />
-            </label>
-            <label className="text-xs font-bold text-slate-500">To
-              <input type="date" value={toDate} min={fromDate} onChange={(event) => setToDate(event.target.value)} className="block mt-1 px-2 py-2 rounded-xl border border-slate-200 text-xs text-slate-700" />
-            </label>
-            <select value={selectedBatch} onChange={(event) => setSelectedBatch(event.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
-              <option value="All">All active batches</option>
-              {activeBatches.map((batch) => <option key={batch} value={batch}>{batch}</option>)}
-            </select>
-            <button type="button" onClick={loadReport} disabled={attendanceLoading} className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 disabled:opacity-50">
-              <RefreshCw className={`h-3.5 w-3.5 ${attendanceLoading ? 'animate-spin' : ''}`} /> Load
-            </button>
-            <button type="button" onClick={printReport} disabled={attendanceLoading || !attendanceReport.length} className="px-3 py-2 rounded-xl bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 disabled:opacity-50">
-              <Printer className="h-3.5 w-3.5" /> Print report
-            </button>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
+            <div className="col-span-2 grid grid-cols-2 gap-2 sm:contents">
+              <label className="min-w-0 text-xs font-bold text-slate-500">From
+                <input type="date" value={fromDate} max={toDate} onChange={(event) => setFromDate(event.target.value)} className="block w-full min-w-0 mt-1 px-2 py-2 rounded-xl border border-slate-200 text-xs text-slate-700" />
+              </label>
+              <label className="min-w-0 text-xs font-bold text-slate-500">To
+                <input type="date" value={toDate} min={fromDate} onChange={(event) => setToDate(event.target.value)} className="block w-full min-w-0 mt-1 px-2 py-2 rounded-xl border border-slate-200 text-xs text-slate-700" />
+              </label>
+            </div>
+            <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_2.75rem_2.75rem] items-end gap-2 sm:contents">
+              <select value={selectedBatch} onChange={(event) => setSelectedBatch(event.target.value)} className="w-full min-w-0 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+                <option value="All">All active batches</option>
+                {activeBatches.map((batch) => <option key={batch} value={batch}>{batch}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={loadReport}
+                disabled={attendanceLoading}
+                aria-label="Load attendance report"
+                title="Load attendance report"
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-700 font-bold text-xs disabled:opacity-50 sm:h-auto sm:w-auto sm:gap-2 sm:px-3 sm:py-2"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${attendanceLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Load</span>
+              </button>
+              <button
+                type="button"
+                onClick={printReport}
+                disabled={attendanceLoading || !attendanceReport.length}
+                aria-label="Print attendance report"
+                title="Print attendance report"
+                className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-700 text-white font-bold text-xs disabled:opacity-50 sm:h-auto sm:w-auto sm:gap-2 sm:px-3 sm:py-2"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Print report</span>
+              </button>
+            </div>
           </div>
         </div>
 

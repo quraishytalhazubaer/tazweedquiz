@@ -46,3 +46,20 @@ body {
 .animate-slide-in {
   animation: slide-in 0.25s ease-out;
 }
+
+@media (max-width: 639px) {
+  .flex:not(.flex-col):has(> button + button) {
+    align-items: stretch;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .flex:not(.flex-col):has(> button + button) > button {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+}

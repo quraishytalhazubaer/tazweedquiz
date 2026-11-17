@@ -224,22 +224,22 @@ function TeacherDashboard({
           <p className="text-sm text-slate-500 mt-1">শিক্ষার্থীরা কুইজ পরীক্ষা জমা দিলে রিয়েল-টাইমে এখানে যুক্ত হবে।</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-3">
           {canManageExam && <button
             onClick={openConfigSettings}
-            className="p-3 bg-slate-50 hover:bg-slate-150 text-slate-700 rounded-2xl border border-slate-200 transition-all flex items-center gap-2 font-bold text-xs"
+            className="flex items-center justify-center gap-2 p-3 text-center text-xs font-bold text-slate-700 transition-all rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-150 sm:justify-start sm:text-left"
             title="Settings"
           >
             <Settings className="h-4 w-4" /> Settings
           </button>}
 
-          {onManageUsers && <button onClick={onManageUsers} className="p-3 bg-slate-50 hover:bg-slate-150 text-slate-700 rounded-2xl border border-slate-200 transition-all flex items-center gap-2 font-bold text-xs" title="User management">
+          {onManageUsers && <button onClick={onManageUsers} className="flex items-center justify-center gap-2 p-3 text-center text-xs font-bold text-slate-700 transition-all rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-150 sm:justify-start sm:text-left" title="User management">
             <ShieldCheck className="h-4 w-4" /> Users
           </button>}
 
           {canManageExam && <button
             onClick={() => setIsExamActive(!isExamActive)}
-            className={`px-5 py-2.5 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all duration-200 border ${
+            className={`w-full justify-center text-center px-5 py-2.5 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all duration-200 border sm:w-auto sm:justify-start sm:text-left ${
               isExamActive
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                 : 'bg-rose-50 text-rose-800 border-rose-200'
@@ -251,7 +251,7 @@ function TeacherDashboard({
 
           <button
             onClick={onRefresh}
-            className="p-3 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-2xl border border-slate-200 transition-all"
+            className="flex items-center justify-center p-3 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-2xl border border-slate-200 transition-all sm:justify-start"
             title="পুনরায় লোড করুন"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -546,20 +546,22 @@ function TeacherDashboard({
                         {totalMarks}
                       </td>}
 
-                      {(canViewMarks || canGrade) && <td className="py-3 px-3 text-right space-x-2 sm:py-4 sm:px-6">
-                        {canViewMarks && <button
-                          onClick={() => onGenerateIndividualPDF([sub], triggerNotification, questions)}
-                          className="p-2 text-slate-400 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition inline-flex items-center"
-                          title="পিডিএফ ডাউনলোড"
-                        >
-                          <FileText className="h-4.5 w-4.5" />
-                        </button>}
-                        {canGrade && <button
-                          onClick={() => onGrade(sub)}
-                          className="px-4 py-1.5 bg-green-900 hover:bg-green-500 active:bg-black text-white hover:text-black font-bold rounded-xl text-xs transition inline-flex items-center"
-                        >
-                          Check
-                        </button>}
+                      {(canViewMarks || canGrade) && <td className="py-3 px-3 sm:py-4 sm:px-6">
+                        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                          {canViewMarks && <button
+                            onClick={() => onGenerateIndividualPDF([sub], triggerNotification, questions)}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-emerald-700 sm:h-auto sm:w-auto sm:p-2"
+                            title="পিডিএফ ডাউনলোড"
+                          >
+                            <FileText className="h-4.5 w-4.5" />
+                          </button>}
+                          {canGrade && <button
+                            onClick={() => onGrade(sub)}
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-green-900 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-green-500 hover:text-black active:bg-black"
+                          >
+                            Check
+                          </button>}
+                        </div>
                       </td>}
                     </tr>
                     )
