@@ -27,6 +27,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
   const [savingReply, setSavingReply] = useState('')
   const [selectedSubmissions, setSelectedSubmissions] = useState({})
   const [expandedSubmissions, setExpandedSubmissions] = useState({})
+  const [expandedBatches, setExpandedBatches] = useState({})
   const [downloading, setDownloading] = useState(false)
 
   const loadAssignments = useCallback(async () => {
@@ -342,6 +343,65 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
     }
   }
 
+  const deleteSelectedSubmissions = async (assignment, batch, selectedRows) => {
+    if (!selectedRows.length) return
+    const confirmation = `${assignment.title} অ্যাসাইনমেন্টে ${batch} ব্যাচের নির্বাচিত ${selectedRows.length}টি জমা, PDF এবং মন্তব্য স্থায়ীভাবে মুছে যাবে। এই কাজ ফেরানো যাবে না। চালিয়ে যাবেন?`
+    if (!window.confirm(confirmation)) return
+
+    const workingKey = `selected:${assignment.id}:${batch}`
+    setWorkingSubmission(workingKey)
+    try {
+      const { data, error } = await supabase
+        .from('assignment_submissions')
+        .delete()
+        .eq('assignment_id', assignment.id)
+        .eq('batch', batch)
+        .in('profile_id', selectedRows.map((submission) => submission.profile_id))
+        .select('profile_id, file_path')
+      if (error) throw error
+      if (!data?.length) throw new Error('নির্বাচিত জমাগুলো পাওয়া যায়নি বা মুছার অনুমতি নেই।')
+
+      const filePaths = data.map((submission) => submission.file_path).filter(Boolean)
+      let storageError = null
+      for (let index = 0; index < filePaths.length; index += 100) {
+        const { error: removeError } = await supabase.storage
+          .from(SUBMISSION_BUCKET)
+          .remove(filePaths.slice(index, index + 100))
+        if (removeError) {
+          storageError = removeError
+          break
+        }
+      }
+      if (storageError) {
+        console.error('Selected assignment submissions were deleted, but some PDFs could not be deleted:', storageError)
+      }
+
+      const deletedKeys = new Set(data.map((submission) => (
+        `${assignment.id}:${submission.profile_id}:${batch}`
+      )))
+      setSelectedSubmissions((current) => Object.fromEntries(
+        Object.entries(current).filter(([submissionKey]) => !deletedKeys.has(submissionKey)),
+      ))
+      setExpandedSubmissions((current) => Object.fromEntries(
+        Object.entries(current).filter(([submissionKey]) => !deletedKeys.has(submissionKey)),
+      ))
+      setReplyDrafts((current) => Object.fromEntries(
+        Object.entries(current).filter(([submissionKey]) => !deletedKeys.has(submissionKey)),
+      ))
+      await loadAssignments()
+
+      if (storageError) {
+        onNotify(`${data.length}টি জমার রেকর্ড ও মন্তব্য মুছে গেছে; তবে কিছু PDF স্টোরেজ থেকে মুছতে পারেনি।`, 'error')
+      } else {
+        onNotify(`${batch} ব্যাচের নির্বাচিত ${data.length}টি জমা, PDF ও মন্তব্য মুছে ফেলা হয়েছে।`, 'success')
+      }
+    } catch (error) {
+      onNotify(`নির্বাচিত জমা মুছে ফেলা যায়নি: ${error.message}`, 'error')
+    } finally {
+      setWorkingSubmission('')
+    }
+  }
+
   const replyToSubmission = async (submission) => {
     const key = `${submission.assignment_id}:${submission.profile_id}:${submission.batch}`
     const comment = (replyDrafts[key] || '').trim()
@@ -366,9 +426,9 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
       if (error) throw error
       setComments((current) => ({ ...current, [key]: [...(current[key] || []), data] }))
       setReplyDrafts((current) => ({ ...current, [key]: '' }))
-      onNotify('শিক্ষার্থীর মন্তব্যের উত্তর পাঠানো হয়েছে।', 'success')
+      onNotify('জমার বিষয়ে মন্তব্য পাঠানো হয়েছে।', 'success')
     } catch (error) {
-      onNotify(`উত্তর পাঠানো যায়নি: ${error.message}`, 'error')
+      onNotify(`মন্তব্য পাঠানো যায়নি: ${error.message}`, 'error')
     } finally {
       setSavingReply('')
     }
@@ -490,36 +550,61 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                     .filter((submission) => submission.batch === target.batch)
                     .sort((first, second) => (second.submitted_at || '').localeCompare(first.submitted_at || ''))
                   const submittedCount = batchSubmissions.filter((submission) => submission.submitted_at).length
-                  const selectableSubmissions = batchSubmissions.filter((submission) => submission.file_path)
-                  const selectedCount = selectableSubmissions.filter((submission) => selectedSubmissions[`${submission.assignment_id}:${submission.profile_id}:${submission.batch}`]).length
-                  const allSelected = selectableSubmissions.length > 0 && selectedCount === selectableSubmissions.length
+                  const selectedBatchSubmissions = batchSubmissions.filter((submission) => selectedSubmissions[`${submission.assignment_id}:${submission.profile_id}:${submission.batch}`])
+                  const selectedFileSubmissions = selectedBatchSubmissions.filter((submission) => submission.file_path)
+                  const selectedCount = selectedBatchSubmissions.length
+                  const allSelected = batchSubmissions.length > 0 && selectedCount === batchSubmissions.length
+                  const batchKey = `${assignment.id}:${target.batch}`
+                  const isBatchExpanded = Boolean(expandedBatches[batchKey])
                   return (
                     <section key={target.batch} className="mt-5 rounded-2xl border border-slate-100 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className={`flex flex-wrap items-center justify-between gap-2 ${isBatchExpanded ? 'border-b border-slate-100 pb-3' : ''}`}>
                         <div>
                           <h4 className="font-bold text-slate-800">{target.batch}</h4>
                           <span className="text-xs text-slate-500">{submittedCount}টি জমা</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          {selectedCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedBatches((current) => ({ ...current, [batchKey]: !current[batchKey] }))}
+                            aria-expanded={isBatchExpanded}
+                            aria-label={`${target.batch} ব্যাচের জমা ${isBatchExpanded ? 'বন্ধ' : 'দেখুন'}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                          >
+                            {isBatchExpanded ? 'লুকান' : 'জমা দেখুন'}
+                            <ChevronDown className={`h-4 w-4 transition-transform ${isBatchExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+                          {isBatchExpanded && <>
+                          {selectedFileSubmissions.length > 0 && (
                             <button
                               type="button"
-                              onClick={() => downloadSubmissions(selectableSubmissions.filter((submission) => selectedSubmissions[`${submission.assignment_id}:${submission.profile_id}:${submission.batch}`]))}
-                              disabled={downloading}
+                              onClick={() => downloadSubmissions(selectedFileSubmissions)}
+                              disabled={downloading || Boolean(workingSubmission)}
                               className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
                             >
                               {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                              {`নির্বাচিত ডাউনলোড (${selectedCount})`}
+                              {`নির্বাচিত ডাউনলোড (${selectedFileSubmissions.length})`}
+                            </button>
+                          )}
+                          {canManage && selectedCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => deleteSelectedSubmissions(assignment, target.batch, selectedBatchSubmissions)}
+                              disabled={Boolean(workingSubmission) || downloading}
+                              className="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                            >
+                              {workingSubmission === `selected:${batchKey}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                              {`নির্বাচিত মুছুন (${selectedCount})`}
                             </button>
                           )}
                           <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
                             <input
                               type="checkbox"
                               checked={allSelected}
-                              disabled={!selectableSubmissions.length}
+                              disabled={!batchSubmissions.length || Boolean(workingSubmission)}
                               onChange={(event) => setSelectedSubmissions((current) => {
                                 const next = { ...current }
-                                for (const submission of selectableSubmissions) {
+                                for (const submission of batchSubmissions) {
                                   const key = `${submission.assignment_id}:${submission.profile_id}:${submission.batch}`
                                   if (event.target.checked) next[key] = true
                                   else delete next[key]
@@ -529,10 +614,11 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                             />
                             সব নির্বাচন
                           </label>
+                          </>}
                         </div>
                       </div>
-                      {target.due_at && <p className="pt-3 text-xs text-slate-500">জমার শেষ সময়: {new Date(target.due_at).toLocaleString()}</p>}
-                      {batchSubmissions.length ? (
+                      {isBatchExpanded && target.due_at && <p className="pt-3 text-xs text-slate-500">জমার শেষ সময়: {new Date(target.due_at).toLocaleString()}</p>}
+                      {isBatchExpanded && (batchSubmissions.length ? (
                         <div className="divide-y divide-slate-100">
                           {batchSubmissions.map((submission, index) => {
                             const key = `${submission.assignment_id}:${submission.profile_id}:${submission.batch}`
@@ -545,6 +631,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                                       type="checkbox"
                                       aria-label={`Select ${submission.student_name || 'student'} submission`}
                                       checked={Boolean(selectedSubmissions[key])}
+                                      disabled={Boolean(workingSubmission)}
                                       onChange={(event) => setSelectedSubmissions((current) => {
                                         const next = { ...current }
                                         if (event.target.checked) next[key] = true
@@ -586,12 +673,12 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                                       <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                     </button>
                                     {canManage && submission.submitted_at && (
-                                      <button type="button" onClick={() => resetSubmission(submission)} disabled={workingSubmission === key} className="inline-flex items-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+                                      <button type="button" onClick={() => resetSubmission(submission)} disabled={Boolean(workingSubmission)} className="inline-flex items-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
                                         {workingSubmission === key ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />} জমা রিসেট
                                       </button>
                                     )}
                                     {canManage && (
-                                      <button type="button" onClick={() => deleteSubmission(submission)} disabled={workingSubmission === key} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                                      <button type="button" onClick={() => deleteSubmission(submission)} disabled={Boolean(workingSubmission)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
                                         {workingSubmission === key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} PDF মুছুন
                                       </button>
                                     )}
@@ -606,7 +693,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                                       </div>
                                     )}
                                     <div className="space-y-2">
-                                      <p className="text-xs font-bold text-slate-600">মন্তব্য ও উত্তর</p>
+                                      <p className="text-xs font-bold text-slate-600">মন্তব্য</p>
                                       {(comments[key] || []).map((comment) => (
                                         <div key={comment.id} className="rounded-xl border border-slate-100 bg-white p-3">
                                           <p className="mb-1 text-xs font-bold text-emerald-700">{comment.author_id === submission.profile_id ? 'শিক্ষার্থী' : 'শিক্ষক'}</p>
@@ -623,7 +710,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                                           maxLength={2000}
                                           value={replyDrafts[key] || ''}
                                           onChange={(event) => setReplyDrafts((current) => ({ ...current, [key]: event.target.value }))}
-                                          placeholder="শিক্ষার্থীর মন্তব্যের উত্তর লিখুন"
+                                          placeholder="এই জমা সম্পর্কে মন্তব্য লিখুন"
                                           className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none"
                                         />
                                         <button
@@ -632,7 +719,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                                           disabled={savingReply === key || !(replyDrafts[key] || '').trim()}
                                           className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                                         >
-                                          {savingReply === key ? 'পাঠানো হচ্ছে...' : 'উত্তর পাঠান'}
+                                          {savingReply === key ? 'পাঠানো হচ্ছে...' : 'মন্তব্য পাঠান'}
                                         </button>
                                       </>
                                     )}
@@ -642,7 +729,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                             )
                           })}
                         </div>
-                      ) : <p className="pt-3 text-sm text-slate-500">এই ব্যাচে এখনো কোনো PDF সংরক্ষণ বা জমা হয়নি।</p>}
+                      ) : <p className="pt-3 text-sm text-slate-500">এই ব্যাচে এখনো কোনো PDF সংরক্ষণ বা জমা হয়নি।</p>)}
                     </section>
                   )
                 })}

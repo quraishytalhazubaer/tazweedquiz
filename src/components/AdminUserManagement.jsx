@@ -311,6 +311,32 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
     setWorking(false);
   };
 
+  const unassignBatch = async (user, batch) => {
+    if (!window.confirm(`${user.full_name || user.email} থেকে ${batch} batch সরাবেন?`)) return;
+
+    setWorking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "admin-user-management",
+        { body: { action: "unassign-batch", userId: user.id, batch } },
+      );
+      if (error || data?.error) {
+        onNotify(`Batch সরানো যায়নি: ${error?.message || data.error}`, "error");
+        return;
+      }
+
+      const updatedUser = { ...user, batch: data.batch };
+      setUsers((current) => current.map((item) => item.id === user.id ? updatedUser : item));
+      setSelectedUser((current) => current?.id === user.id ? updatedUser : current);
+      onNotify(`${batch} batch student থেকে সরানো হয়েছে।`, "success");
+    } catch (error) {
+      console.error("Failed to unassign student batch:", error);
+      onNotify(`Batch সরানো যায়নি: ${error.message || "Unknown error."}`, "error");
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const toggleBatchStatus = async (batch) => {
     if (!onToggleBatchStatus) return;
     const isActive = activeBatches.includes(batch);
@@ -1035,7 +1061,21 @@ function AdminUserManagement({ currentUserId, onNotify, onBack, activeBatches = 
             <div className="mt-3 rounded-2xl bg-slate-50 p-4">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Batches</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {(Array.isArray(selectedUser.batch) ? selectedUser.batch : selectedUser.batch ? [selectedUser.batch] : []).length ? (Array.isArray(selectedUser.batch) ? selectedUser.batch : [selectedUser.batch]).map((batch) => <span key={batch} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200">{batch}</span>) : <span className="text-sm text-slate-500">Unassigned</span>}
+                {getUserBatches(selectedUser).length ? getUserBatches(selectedUser).map((batch) => (
+                  <span key={batch} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white py-1 pl-3 pr-1 text-xs font-bold text-slate-700">
+                    {batch}
+                    <button
+                      type="button"
+                      onClick={() => unassignBatch(selectedUser, batch)}
+                      disabled={working}
+                      aria-label={`Remove ${batch} batch`}
+                      title={`Remove ${batch} batch`}
+                      className="rounded-full p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                )) : <span className="text-sm text-slate-500">Unassigned</span>}
               </div>
             </div>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">

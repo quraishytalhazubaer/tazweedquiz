@@ -213,7 +213,7 @@ function TeacherDashboard({
         onSaveBatchQuestionSet={onSaveBatchQuestionSet}
       />
     ) : (
-    <div className="space-y-6 animate-slide-in">
+    <div className="space-y-4 sm:space-y-6 animate-slide-in">
       {/* Top Header Controls */}
       <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-slate-200/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
@@ -272,10 +272,10 @@ function TeacherDashboard({
       )}
 
       {/* Filters and Exports Bar */}
-      <div className="sticky top-20 z-20 -mx-4 px-4 py-3 bg-slate-50/95 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="-mx-4 px-4 py-3 bg-slate-50/95 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {/* Search */}
-        <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex items-center">
+        <div className="relative col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex items-center lg:col-span-1">
           <span className="absolute left-3.5 text-slate-400">
             <Search className="h-4 w-4" />
           </span>
@@ -289,25 +289,23 @@ function TeacherDashboard({
         </div>
 
         {/* Branch Filter */}
-        <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center">
-          <input
-            type="text"
-            list="submission-branches"
-            placeholder="শাখা লিখে খুঁজুন..."
+        <div className="relative min-w-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center">
+          <select
             aria-label="Filter submissions by branch"
-            className="w-full px-4 py-3 bg-transparent text-sm text-slate-700 focus:outline-none font-semibold placeholder:text-slate-400"
+            className="w-full appearance-none truncate bg-transparent py-3 pl-3 pr-8 text-xs font-semibold text-slate-700 focus:outline-none sm:px-4 sm:pr-10 sm:text-sm"
             value={branchFilter}
             onChange={(e) => setBranchFilter(e.target.value)}
-          />
-          <datalist id="submission-branches">
-            {branches.map((branch, index) => <option key={index} value={branch} />)}
-          </datalist>
+          >
+            <option value="">সকল শাখা</option>
+            {branches.map((branch) => <option key={branch} value={branch}>{branch}</option>)}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2 h-4 w-4 text-slate-400 sm:right-3" />
         </div>
 
         {/* Dynamic Database Report Batch Selector */}
-        <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center">
+        <div className="relative min-w-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center">
           <select
-            className="w-full px-4 py-3 bg-transparent text-sm text-slate-700 focus:outline-none appearance-none cursor-pointer font-semibold"
+            className="w-full appearance-none truncate bg-transparent py-3 pl-3 pr-8 text-xs font-semibold text-slate-700 focus:outline-none sm:px-4 sm:pr-10 sm:text-sm"
             value={selectedReportBatch}
             onChange={(e) => setSelectedReportBatch(e.target.value)}
           >
@@ -318,10 +316,11 @@ function TeacherDashboard({
               </option>
             ))}
           </select>
+          <ChevronDown className="pointer-events-none absolute right-2 h-4 w-4 text-slate-400 sm:right-3" />
         </div>
 
         {/* Export Buttons */}
-        {canViewMarks && <div className="flex gap-2">
+        {canViewMarks && <div className="col-span-2 flex gap-2 lg:col-span-1">
           <button
             onClick={() => onExportExcel(filteredSubmissions, triggerNotification, questions)}
             className="flex-1 px-3 py-3 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-950 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors"
@@ -382,11 +381,11 @@ function TeacherDashboard({
       )}
 
       {/* Submissions Table */}
-      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm max-h-[calc(100vh-14rem)] overflow-auto">
+      <div className="sticky top-[4.5rem] z-20 -mx-3 h-[calc(100dvh-4.5rem)] overflow-auto bg-white shadow-sm sm:mx-0 sm:rounded-3xl sm:border-x">
         <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="bg-slate-50 border-b border-slate-150 text-xs font-bold uppercase text-slate-500 tracking-wider">
-                {canViewMarks && <th className="py-4 px-6 text-center w-12">
+                {canViewMarks && <th className="py-3 px-3 text-center w-12 sm:py-4 sm:px-6">
                   <input
                     type="checkbox"
                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
@@ -394,32 +393,32 @@ function TeacherDashboard({
                     onChange={toggleSelectAll}
                   />
                 </th>}
-                <th className="py-4 px-4">SL</th>
-                <th className="py-4 px-4" aria-sort={sortBy === 'id' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <th className="py-3 px-2 sm:py-4 sm:px-4">SL</th>
+                <th className="py-3 px-2 sm:py-4 sm:px-4" aria-sort={sortBy === 'id' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                   <button type="button" onClick={() => handleSort('id')} className="inline-flex items-center gap-1.5" aria-label={`Sort by ID ${sortBy === 'id' && sortDirection === 'asc' ? 'descending' : 'ascending'}`}>
                     আইডি {sortIcon('id')}
                   </button>
                 </th>
-                <th className="py-4 px-4">নাম</th>
-                <th className="py-4 px-4">Gender</th>
-                <th className="py-4 px-4">শাখা</th>
-                <th className="py-4 px-4">ব্যাচ</th>
-                <th className="py-4 px-4">জমাদানের সময়</th>
+                <th className="py-3 px-2 sm:py-4 sm:px-4">নাম</th>
+                <th className="py-3 px-2 sm:py-4 sm:px-4">Gender</th>
+                <th className="py-3 px-2 sm:py-4 sm:px-4">শাখা</th>
+                <th className="py-3 px-2 sm:py-4 sm:px-4">ব্যাচ</th>
+                <th className="py-3 px-2 sm:py-4 sm:px-4">জমাদানের সময়</th>
                 {canViewMarks && <>
-                  <th className="py-4 px-4 text-center">মূল্যায়ন অবস্থা</th>
-                  <th className="py-4 px-4 text-center" aria-sort={sortBy === 'marks' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <th className="py-3 px-2 text-center sm:py-4 sm:px-4">মূল্যায়ন অবস্থা</th>
+                  <th className="py-3 px-2 text-center sm:py-4 sm:px-4" aria-sort={sortBy === 'marks' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                     <button type="button" onClick={() => handleSort('marks')} className="inline-flex items-center justify-center gap-1.5" aria-label={`Sort by marks ${sortBy === 'marks' && sortDirection === 'desc' ? 'ascending' : 'descending'}`}>
                       প্রাপ্ত নম্বর (১০) {sortIcon('marks')}
                     </button>
                   </th>
-                  <th className="py-4 px-4 text-center">ভাইভা (৫)</th>
-                  <th className="py-4 px-4 text-center" aria-sort={sortBy === 'totalMarks' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <th className="py-3 px-2 text-center sm:py-4 sm:px-4">ভাইভা (৫)</th>
+                  <th className="py-3 px-2 text-center sm:py-4 sm:px-4" aria-sort={sortBy === 'totalMarks' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                     <button type="button" onClick={() => handleSort('totalMarks')} className="inline-flex items-center justify-center gap-1.5" aria-label={`Sort by total marks ${sortBy === 'totalMarks' && sortDirection === 'desc' ? 'ascending' : 'descending'}`}>
                       মোট নম্বর (১৫) {sortIcon('totalMarks')}
                     </button>
                   </th>
                 </>}
-                {(canViewMarks || canGrade) && <th className="py-4 px-6 text-right">অ্যাকশন</th>}
+                {(canViewMarks || canGrade) && <th className="py-3 px-3 text-right sm:py-4 sm:px-6">অ্যাকশন</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -482,7 +481,7 @@ function TeacherDashboard({
 
                   return (
                     <tr key={sub.id || idx} className={`hover:bg-slate-50/40 transition-colors ${isChecked ? 'bg-emerald-50/20' : ''}`}>
-                      {canViewMarks && <td className="py-4 px-6 text-center">
+                      {canViewMarks && <td className="py-3 px-3 text-center sm:py-4 sm:px-6">
                         <input
                           type="checkbox"
                           className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
@@ -490,18 +489,18 @@ function TeacherDashboard({
                           onChange={() => toggleSelectOne(sub.id)}
                         />
                       </td>}
-                      <td className="py-4 px-4 text-xs text-slate-500 font-mono">{serialNumbers.get(sub.id)}</td>
-                      <td className="py-4 px-4 font-mono text-xs text-slate-600 font-bold">{sub.userId || '---'}</td>
-                      <td className="py-4 px-4">
+                      <td className="py-3 px-2 text-xs text-slate-500 font-mono sm:py-4 sm:px-4">{serialNumbers.get(sub.id)}</td>
+                      <td className="py-3 px-2 font-mono text-xs text-slate-600 font-bold sm:py-4 sm:px-4">{sub.userId || '---'}</td>
+                      <td className="py-3 px-2 sm:py-4 sm:px-4">
                         <div className="font-bold text-slate-950">{sub.userName}</div>
                       </td>
-                      <td className="py-4 px-4 text-slate-600 font-medium">{getGenderLabel(sub.gender)}</td>
-                      <td className="py-4 px-4 text-slate-600 font-medium">{sub.userBranch || '---'}</td>
-                      <td className="py-4 px-4 text-slate-600 font-medium">{sub.batch || sub.userBatchGroup || '---'}</td>
-                      <td className="py-4 px-4 text-xs text-slate-500 font-sans">{sub.timestamp || sub.date || '---'}</td>
+                      <td className="py-3 px-2 text-slate-600 font-medium sm:py-4 sm:px-4">{getGenderLabel(sub.gender)}</td>
+                      <td className="py-3 px-2 text-slate-600 font-medium sm:py-4 sm:px-4">{sub.userBranch || '---'}</td>
+                      <td className="py-3 px-2 text-slate-600 font-medium sm:py-4 sm:px-4">{sub.batch || sub.userBatchGroup || '---'}</td>
+                      <td className="py-3 px-2 text-xs text-slate-500 font-sans sm:py-4 sm:px-4">{sub.timestamp || sub.date || '---'}</td>
                       
                       {/* Evaluation Status Badge */}
-                      {canViewMarks && <td className="py-4 px-4 text-center">
+                      {canViewMarks && <td className="py-3 px-2 text-center sm:py-4 sm:px-4">
                         {isGraded ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
                             Graded
@@ -518,12 +517,12 @@ function TeacherDashboard({
                       </td>}
                       
                       {/* Written Marks */}
-                      {canViewMarks && <td className="py-4 px-4 text-center font-black text-base text-[#1B4D1A]">
+                      {canViewMarks && <td className="py-3 px-2 text-center font-black text-base text-[#1B4D1A] sm:py-4 sm:px-4">
                         {isEvaluated ? existingMarks : '---'}
                       </td>}
 
                       {/* Viva Marks Input - Locked / Read-Only when Graded */}
-                      {canViewMarks && <td className="py-4 px-4 text-center">
+                      {canViewMarks && <td className="py-3 px-2 text-center sm:py-4 sm:px-4">
                         <input
                           type="number"
                           min="0"
@@ -543,11 +542,11 @@ function TeacherDashboard({
                       </td>}
 
                       {/* Total Marks */}
-                      {canViewMarks && <td className="py-4 px-4 text-center font-black text-base text-emerald-800">
+                      {canViewMarks && <td className="py-3 px-2 text-center font-black text-base text-emerald-800 sm:py-4 sm:px-4">
                         {totalMarks}
                       </td>}
 
-                      {(canViewMarks || canGrade) && <td className="py-4 px-6 text-right space-x-2">
+                      {(canViewMarks || canGrade) && <td className="py-3 px-3 text-right space-x-2 sm:py-4 sm:px-6">
                         {canViewMarks && <button
                           onClick={() => onGenerateIndividualPDF([sub], triggerNotification, questions)}
                           className="p-2 text-slate-400 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition inline-flex items-center"

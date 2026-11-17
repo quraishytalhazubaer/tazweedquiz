@@ -563,6 +563,31 @@ Deno.serve(async (request) => {
       return json({ success: true })
     }
 
+    if (payload.action === 'unassign-batch') {
+      if (typeof payload.userId !== 'string' || typeof payload.batch !== 'string' || !payload.batch.trim()) {
+        return json({ error: 'A valid student ID and batch name are required.' }, 400)
+      }
+      const batch = payload.batch.trim()
+      const { data: profile, error: profileError } = await adminClient
+        .from('profiles')
+        .select('id, role, batch')
+        .eq('id', payload.userId)
+        .maybeSingle()
+      if (profileError) return json({ error: profileError.message }, 400)
+      if (!profile || profile.role !== 'student') return json({ error: 'Student profile not found.' }, 404)
+
+      const currentBatches = Array.isArray(profile.batch) ? profile.batch : profile.batch ? [profile.batch] : []
+      const updatedBatches = currentBatches.filter((currentBatch) => currentBatch !== batch)
+      if (updatedBatches.length !== currentBatches.length) {
+        const { error } = await adminClient
+          .from('profiles')
+          .update({ batch: updatedBatches })
+          .eq('id', profile.id)
+        if (error) return json({ error: error.message }, 400)
+      }
+      return json({ success: true, batch: updatedBatches })
+    }
+
     if (payload.action === 'delete-user') {
       if (typeof payload.userId !== 'string' || payload.userId === authData.user.id) {
         return json({ error: 'A valid user ID other than your own is required.' }, 400)
