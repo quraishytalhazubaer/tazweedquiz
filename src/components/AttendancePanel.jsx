@@ -271,17 +271,17 @@ function AttendancePanel({
             <h4 className="text-sm font-black text-slate-900">আজকের উপস্থিতি</h4>
             <p className="text-xs text-slate-500 mt-1">যেসব অংশগ্রহণকারী কোড দিয়ে হাজিরা দিয়েছেন</p>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end lg:flex-nowrap">
             <div className="col-span-2 grid grid-cols-2 gap-2 sm:contents">
-              <label className="min-w-0 text-xs font-bold text-slate-500">From
+              <label className="min-w-0 text-xs font-bold text-slate-500 lg:w-36 lg:flex-none">From
                 <input type="date" value={fromDate} max={toDate} onChange={(event) => setFromDate(event.target.value)} className="block w-full min-w-0 mt-1 px-2 py-2 rounded-xl border border-slate-200 text-xs text-slate-700" />
               </label>
-              <label className="min-w-0 text-xs font-bold text-slate-500">To
+              <label className="min-w-0 text-xs font-bold text-slate-500 lg:w-36 lg:flex-none">To
                 <input type="date" value={toDate} min={fromDate} onChange={(event) => setToDate(event.target.value)} className="block w-full min-w-0 mt-1 px-2 py-2 rounded-xl border border-slate-200 text-xs text-slate-700" />
               </label>
             </div>
             <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_2.75rem_2.75rem] items-end gap-2 sm:contents">
-              <select value={selectedBatch} onChange={(event) => setSelectedBatch(event.target.value)} className="w-full min-w-0 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+              <select value={selectedBatch} onChange={(event) => setSelectedBatch(event.target.value)} className="w-full min-w-0 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 lg:w-48 lg:flex-none">
                 <option value="All">All active batches</option>
                 {activeBatches.map((batch) => <option key={batch} value={batch}>{batch}</option>)}
               </select>
