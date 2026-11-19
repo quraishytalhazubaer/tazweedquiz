@@ -12,8 +12,18 @@ const ACCEPTED_ATTACHMENTS = {
   'image/webp': '.webp',
 }
 const emptyForm = { title: '', description: '', batches: [], deadlines: {}, files: [] }
+const parseAssignmentMark = (value) => {
+  if (value === '' || value == null) return null
+  const mark = Number(value)
+  return Number.isFinite(mark)
+    && mark >= 0
+    && mark <= 3
+    && Math.abs(mark * 100 - Math.round(mark * 100)) < 1e-8
+    ? mark
+    : null
+}
 
-function AssignmentManagement({ canManage = false, activeBatches = [], onNotify }) {
+function AssignmentManagement({ canManage = false, activeBatches = [], onNotify, onMarksUpdated }) {
   const [assignments, setAssignments] = useState([])
   const [submissions, setSubmissions] = useState([])
   const [comments, setComments] = useState({})
@@ -29,6 +39,8 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
   const [expandedSubmissions, setExpandedSubmissions] = useState({})
   const [expandedBatches, setExpandedBatches] = useState({})
   const [downloading, setDownloading] = useState(false)
+  const [assignmentMarkDrafts, setAssignmentMarkDrafts] = useState({})
+  const [bulkMarkDraft, setBulkMarkDraft] = useState('')
 
   const loadAssignments = useCallback(async () => {
     setLoading(true)
@@ -294,7 +306,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
     try {
       const { data, error } = await supabase
         .from('assignment_submissions')
-        .update({ submitted_at: null })
+        .update({ submitted_at: null, marks: null })
         .eq('assignment_id', submission.assignment_id)
         .eq('profile_id', submission.profile_id)
         .eq('batch', submission.batch)
@@ -303,8 +315,14 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
         .maybeSingle()
       if (error) throw error
       if (!data) throw new Error('জমাটি পাওয়া যায়নি বা রিসেট করার অনুমতি নেই।')
+      setAssignmentMarkDrafts((current) => {
+        const next = { ...current }
+        delete next[key]
+        return next
+      })
       onNotify('জমা রিসেট হয়েছে।', 'success')
       await loadAssignments()
+      await onMarksUpdated?.()
     } catch (error) {
       onNotify(`জমা রিসেট করা যায়নি: ${error.message}`, 'error')
     } finally {
@@ -336,6 +354,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
         onNotify('PDF এবং জমার রেকর্ড মুছে ফেলা হয়েছে।', 'success')
       }
       await loadAssignments()
+      await onMarksUpdated?.()
     } catch (error) {
       onNotify(`PDF মুছে ফেলা যায়নি: ${error.message}`, 'error')
     } finally {
@@ -389,6 +408,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
         Object.entries(current).filter(([submissionKey]) => !deletedKeys.has(submissionKey)),
       ))
       await loadAssignments()
+      await onMarksUpdated?.()
 
       if (storageError) {
         onNotify(`${data.length}টি জমার রেকর্ড ও মন্তব্য মুছে গেছে; তবে কিছু PDF স্টোরেজ থেকে মুছতে পারেনি।`, 'error')
@@ -397,6 +417,96 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
       }
     } catch (error) {
       onNotify(`নির্বাচিত জমা মুছে ফেলা যায়নি: ${error.message}`, 'error')
+    } finally {
+      setWorkingSubmission('')
+    }
+  }
+
+  const saveSubmissionMark = async (submission) => {
+    const key = `${submission.assignment_id}:${submission.profile_id}:${submission.batch}`
+    const mark = parseAssignmentMark(assignmentMarkDrafts[key] ?? submission.marks)
+    if (mark === null) {
+      onNotify('অ্যাসাইনমেন্ট নম্বর ০ থেকে ৩-এর মধ্যে দিতে হবে (সর্বোচ্চ ২ দশমিক)।', 'error')
+      return
+    }
+
+    setWorkingSubmission(`mark:${key}`)
+    try {
+      const { data, error } = await supabase
+        .from('assignment_submissions')
+        .update({ marks: mark })
+        .eq('assignment_id', submission.assignment_id)
+        .eq('profile_id', submission.profile_id)
+        .eq('batch', submission.batch)
+        .not('submitted_at', 'is', null)
+        .select('marks')
+        .maybeSingle()
+      if (error) throw error
+      if (!data) throw new Error('জমাটি পাওয়া যায়নি বা নম্বর দেওয়ার অনুমতি নেই।')
+
+      setSubmissions((current) => current.map((item) => (
+        item.assignment_id === submission.assignment_id
+          && item.profile_id === submission.profile_id
+          && item.batch === submission.batch
+          ? { ...item, marks: data.marks }
+          : item
+      )))
+      setAssignmentMarkDrafts((current) => ({ ...current, [key]: String(data.marks) }))
+      await onMarksUpdated?.()
+      onNotify('অ্যাসাইনমেন্টের নম্বর সংরক্ষণ হয়েছে।', 'success')
+    } catch (error) {
+      onNotify(`অ্যাসাইনমেন্টের নম্বর সংরক্ষণ করা যায়নি: ${error.message}`, 'error')
+    } finally {
+      setWorkingSubmission('')
+    }
+  }
+
+  const applyMarkToSelected = async (assignment, batch, selectedRows) => {
+    const mark = parseAssignmentMark(bulkMarkDraft)
+    if (mark === null) {
+      onNotify('অ্যাসাইনমেন্ট নম্বর ০ থেকে ৩-এর মধ্যে দিতে হবে (সর্বোচ্চ ২ দশমিক)।', 'error')
+      return
+    }
+    if (!selectedRows.length) return
+
+    const workingKey = `bulk-mark:${assignment.id}:${batch}`
+    setWorkingSubmission(workingKey)
+    try {
+      const { data, error } = await supabase
+        .from('assignment_submissions')
+        .update({ marks: mark })
+        .eq('assignment_id', assignment.id)
+        .eq('batch', batch)
+        .in('profile_id', selectedRows.map((submission) => submission.profile_id))
+        .not('submitted_at', 'is', null)
+        .select('profile_id, marks')
+      if (error) throw error
+      if (!data?.length) throw new Error('নির্বাচিত জমাগুলো পাওয়া যায়নি বা নম্বর দেওয়ার অনুমতি নেই।')
+
+      const marksByProfile = new Map(data.map((item) => [item.profile_id, item.marks]))
+      setSubmissions((current) => current.map((submission) => (
+        submission.assignment_id === assignment.id
+          && submission.batch === batch
+          && marksByProfile.has(submission.profile_id)
+          ? { ...submission, marks: marksByProfile.get(submission.profile_id) }
+          : submission
+      )))
+      setAssignmentMarkDrafts((current) => ({
+        ...current,
+        ...Object.fromEntries(data.map((item) => [
+          `${assignment.id}:${item.profile_id}:${batch}`,
+          String(item.marks),
+        ])),
+      }))
+      await onMarksUpdated?.()
+
+      if (data.length !== selectedRows.length) {
+        onNotify(`${selectedRows.length}টির মধ্যে ${data.length}টি জমায় নম্বর সংরক্ষণ হয়েছে; তালিকা রিফ্রেশ করে বাকি জমাগুলো যাচাই করুন।`, 'error')
+      } else {
+        onNotify(`নির্বাচিত ${data.length}টি জমায় ${mark} / 3 নম্বর দেওয়া হয়েছে।`, 'success')
+      }
+    } catch (error) {
+      onNotify(`নির্বাচিত জমাগুলোতে নম্বর দেওয়া যায়নি: ${error.message}`, 'error')
     } finally {
       setWorkingSubmission('')
     }
@@ -551,6 +661,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                     .sort((first, second) => (second.submitted_at || '').localeCompare(first.submitted_at || ''))
                   const submittedCount = batchSubmissions.filter((submission) => submission.submitted_at).length
                   const selectedBatchSubmissions = batchSubmissions.filter((submission) => selectedSubmissions[`${submission.assignment_id}:${submission.profile_id}:${submission.batch}`])
+                  const selectedSubmittedSubmissions = selectedBatchSubmissions.filter((submission) => submission.submitted_at)
                   const selectedFileSubmissions = selectedBatchSubmissions.filter((submission) => submission.file_path)
                   const selectedCount = selectedBatchSubmissions.length
                   const allSelected = batchSubmissions.length > 0 && selectedCount === batchSubmissions.length
@@ -563,7 +674,7 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                           <h4 className="font-bold text-slate-800">{target.batch}</h4>
                           <span className="text-xs text-slate-500">{submittedCount}টি জমা</span>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                           <button
                             type="button"
                             onClick={() => setExpandedBatches((current) => ({ ...current, [batchKey]: !current[batchKey] }))}
@@ -596,6 +707,32 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                               {workingSubmission === `selected:${batchKey}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                               {`নির্বাচিত মুছুন (${selectedCount})`}
                             </button>
+                          )}
+                          {canManage && selectedSubmittedSubmissions.length > 0 && (
+                            <div className="flex items-end gap-2">
+                              <label className="text-xs font-bold text-slate-600">
+                                নম্বর / ৩
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="3"
+                                  step="0.01"
+                                  value={bulkMarkDraft}
+                                  onChange={(event) => setBulkMarkDraft(event.target.value)}
+                                  aria-label={`${target.batch} নির্বাচিত জমার নম্বর, ৩-এর মধ্যে`}
+                                  className="mt-1 w-24 rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => applyMarkToSelected(assignment, target.batch, selectedSubmittedSubmissions)}
+                                disabled={Boolean(workingSubmission) || parseAssignmentMark(bulkMarkDraft) === null}
+                                className="inline-flex items-center gap-2 rounded-lg bg-sky-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                              >
+                                {workingSubmission === `bulk-mark:${batchKey}` ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                                নির্বাচিতকে নম্বর দিন ({selectedSubmittedSubmissions.length})
+                              </button>
+                            </div>
                           )}
                           <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
                             <input
@@ -644,6 +781,38 @@ function AssignmentManagement({ canManage = false, activeBatches = [], onNotify 
                                     <div>
                                       <p className="font-bold text-slate-800">{submission.student_name || 'শিক্ষার্থী'}{submission.employee_id ? ` · ${submission.employee_id}` : ''}</p>
                                       <p className="mt-1 text-xs text-slate-500">{submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : 'PDF সংরক্ষিত, এখনো জমা হয়নি'}</p>
+                                      {submission.submitted_at && (
+                                        canManage ? (
+                                          <div className="mt-2 flex items-end gap-2">
+                                            <label className="text-xs font-bold text-slate-600">
+                                              নম্বর / ৩
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max="3"
+                                                step="0.01"
+                                                value={assignmentMarkDrafts[key] ?? (submission.marks ?? '')}
+                                                onChange={(event) => setAssignmentMarkDrafts((current) => ({ ...current, [key]: event.target.value }))}
+                                                aria-label={`${submission.student_name || 'শিক্ষার্থী'}-এর অ্যাসাইনমেন্ট নম্বর, ৩-এর মধ্যে`}
+                                                className="mt-1 w-24 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
+                                              />
+                                            </label>
+                                            <button
+                                              type="button"
+                                              onClick={() => saveSubmissionMark(submission)}
+                                              disabled={Boolean(workingSubmission) || parseAssignmentMark(assignmentMarkDrafts[key] ?? submission.marks) === null}
+                                              className="inline-flex items-center gap-1 rounded-lg bg-sky-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                                            >
+                                              {workingSubmission === `mark:${key}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                              সংরক্ষণ
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <p className="mt-2 text-xs font-bold text-emerald-700">
+                                            নম্বর: {submission.marks == null ? 'মূল্যায়ন হয়নি' : `${submission.marks}`}
+                                          </p>
+                                        )
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex flex-wrap gap-2">

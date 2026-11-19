@@ -14,7 +14,7 @@ import TeacherNavigation from './components/TeacherNavigation';
 import AdminUserManagement from './components/AdminUserManagement';
 import TeacherDashboardComponent from './components/TeacherDashboard';
 import GradingWorkspaceComponent from './components/GradingWorkspace';
-import ConfigModal from './components/SettingsModal';
+import BatchConfiguration from './components/BatchConfiguration';
 import AccountSettingsModal from './components/AccountSettingsModal';
 import TeacherContactSettings from './components/TeacherContactSettings';
 import { handleExportExcel, generateSummaryPDF, generateIndividualPDF } from './utils/reports';
@@ -31,14 +31,6 @@ const getLocalDateKey = (date = new Date()) => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-};
-
-const getLastThreeDays = (date = new Date()) => {
-  const yesterday = new Date(date);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const tomorrow = new Date(date);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return [yesterday, date, tomorrow].map(getLocalDateKey);
 };
 
 const getWorkingDaysInRange = (fromDate, toDate) => {
@@ -107,7 +99,9 @@ export default function App() {
   const [attendance, setAttendance] = useState({ isActive: false, code: '', date: '', generatedAt: null });
   const [activeBatches, setActiveBatches] = useState([]);
   const [allBatches, setAllBatches] = useState([]); // Master list of all batches
-  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [batchDateRanges, setBatchDateRanges] = useState({});
+  const [examAcademicMarks, setExamAcademicMarks] = useState({});
+  const [loadingExamAcademicMarks, setLoadingExamAcademicMarks] = useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [isStudentMenuOpen, setIsStudentMenuOpen] = useState(false);
   const [teacherPage, setTeacherPage] = useState(() => sessionStorage.getItem('teacherDashboardPage') || 'materials');
@@ -179,6 +173,7 @@ export default function App() {
     ...(hasTeacherPermission(user, 'materials') ? ['materials'] : []),
     ...(hasTeacherPermission(user, 'assignments') ? ['assignments'] : []),
     ...(hasTeacherPermission(user, 'exam') || hasTeacherPermission(user, 'marks') || hasTeacherPermission(user, 'grading') ? ['exam'] : []),
+    ...(hasTeacherPermission(user, 'exam', 'edit') ? ['batchConfig'] : []),
     ...(hasTeacherPermission(user, 'questions') ? ['questions'] : []),
     ...(hasTeacherPermission(user, 'attendance') ? ['attendance'] : []),
     ...(user?.role === 'teacher' || user?.role === 'admin' ? ['contact'] : []),
@@ -457,12 +452,14 @@ export default function App() {
           : active;
         setActiveBatches(active);
         setAllBatches(master);
+        setBatchDateRanges(payload.new.batch_date_ranges || {});
         setAttendance({
           isActive: Boolean(payload.new.attendance_is_active),
           code: payload.new.attendance_code || '',
           date: payload.new.attendance_date || '',
           generatedAt: payload.new.attendance_generated_at || null,
         });
+        if (hasTeacherPermission(user, 'marks')) fetchExamAcademicMarks();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_batch_question_sets' }, (payload) => {
         setBatchQuestionSets((current) => {
@@ -599,7 +596,7 @@ export default function App() {
       try {
         const { data, error } = await supabase
           .from('exam_config')
-          .select('active_batches, all_batches, attendance_is_active, attendance_code, attendance_date, attendance_generated_at')
+          .select('active_batches, all_batches, batch_date_ranges, attendance_is_active, attendance_code, attendance_date, attendance_generated_at')
           .eq('id', 1)
           .single();
 
@@ -614,6 +611,7 @@ export default function App() {
 
           setActiveBatches(active);
           setAllBatches(master);
+          setBatchDateRanges(data.batch_date_ranges || {});
           setSelectedReportBatch(active[0] || 'All');
           setAttendance({
             isActive: Boolean(data.attendance_is_active),
@@ -703,6 +701,7 @@ export default function App() {
 
       setSubmissions(mappedList);
       setSubmissionsLoaded(true);
+      if (hasTeacherPermission(user, 'marks')) await fetchExamAcademicMarks();
     } catch (err) {
       console.error("Failed to fetch submissions", err);
       setSubmissionLoadError(true);
@@ -725,18 +724,48 @@ export default function App() {
     setGradingSubmission(null);
   };
 
+  async function fetchExamAcademicMarks() {
+    if (!hasTeacherPermission(user, 'marks')) {
+      setExamAcademicMarks({});
+      setLoadingExamAcademicMarks(false);
+      return;
+    }
+
+    setLoadingExamAcademicMarks(true);
+    try {
+      const { data, error } = await supabase.rpc('get_exam_academic_marks');
+      if (error) throw error;
+
+      setExamAcademicMarks(Object.fromEntries((data || []).map((row) => [
+        `${row.profile_id}:${row.batch}`,
+        {
+          attendanceMarks: row.attendance_marks == null ? null : Number(row.attendance_marks),
+          assignmentMarks: row.assignment_marks == null ? null : Number(row.assignment_marks),
+        },
+      ])));
+    } catch (err) {
+      console.error('Failed to fetch attendance and assignment marks:', err);
+      setExamAcademicMarks({});
+      triggerNotification('হাজিরা ও অ্যাসাইনমেন্টের নম্বর লোড করা যায়নি।', 'error');
+    } finally {
+      setLoadingExamAcademicMarks(false);
+    }
+  }
+
   async function fetchAttendanceRecords(filters = {}) {
     setLoadingAttendance(true);
     try {
-      const defaultWorkingDays = getLastThreeDays();
-      const workingDays = filters.workingDays || (
-        filters.fromDate && filters.toDate
-          ? getWorkingDaysInRange(filters.fromDate, filters.toDate)
-          : defaultWorkingDays
-      );
-      const fromDate = filters.fromDate || workingDays[0];
-      const toDate = filters.toDate || workingDays[workingDays.length - 1];
       const today = getLocalDateKey();
+      const defaultBatch = activeBatches[0] || 'All';
+      const defaultBatchDateRange = batchDateRanges[defaultBatch];
+      const hasDefaultBatchDateRange = Boolean(
+        defaultBatchDateRange?.startDate
+          && defaultBatchDateRange?.endDate
+          && defaultBatchDateRange.startDate <= defaultBatchDateRange.endDate
+      );
+      const fromDate = filters.fromDate || (hasDefaultBatchDateRange ? defaultBatchDateRange.startDate : today);
+      const toDate = filters.toDate || (hasDefaultBatchDateRange ? defaultBatchDateRange.endDate : today);
+      const workingDays = filters.workingDays || getWorkingDaysInRange(fromDate, toDate);
       const selectedBatch = filters.batch || activeBatches[0] || 'All';
       const [{ data, error }, { data: students, error: studentsError }, { data: todayRecords, error: todayError }] = await Promise.all([
         supabase
@@ -1163,14 +1192,19 @@ export default function App() {
     }
   };
 
-  const handleSaveConfig = async ({ activeBatches, allBatches }) => {
+  const handleSaveConfig = async ({
+    activeBatches,
+    allBatches,
+    batchDateRanges: updatedBatchDateRanges = batchDateRanges,
+  }) => {
     if (!hasTeacherPermission(user, 'exam', 'edit')) throw new Error('Exam edit permission required.');
     try {
       const { error } = await supabase
         .from('exam_config')
         .update({
           active_batches: activeBatches,
-          all_batches: allBatches
+          all_batches: allBatches,
+          batch_date_ranges: updatedBatchDateRanges,
         })
         .eq('id', 1);
 
@@ -1182,7 +1216,9 @@ export default function App() {
       // UPDATE BOTH LOCAL STATES IMMEDIATELY
       setActiveBatches(activeBatches);
       setAllBatches(allBatches); 
+      setBatchDateRanges(updatedBatchDateRanges);
       setSelectedReportBatch(activeBatches[0] || 'All');
+      if (hasTeacherPermission(user, 'marks')) await fetchExamAcademicMarks();
 
       triggerNotification('কনফিগারেশন সফলভাবে আপডেট করা হয়েছে।', 'success');
     } catch (error) {
@@ -1465,7 +1501,7 @@ export default function App() {
             <div className="min-w-0">
             {!visibleTeacherPage && <p className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-900">আপনার কোনো staff feature access এখনো দেওয়া হয়নি। Admin-এর সঙ্গে যোগাযোগ করুন।</p>}
             {visibleTeacherPage === 'materials' && <CourseMaterials canManage={hasTeacherPermission(user, 'materials', 'edit')} onNotify={triggerNotification} />}
-            {visibleTeacherPage === 'assignments' && <AssignmentManagement canManage={hasTeacherPermission(user, 'assignments', 'edit')} activeBatches={activeBatches} onNotify={triggerNotification} />}
+            {visibleTeacherPage === 'assignments' && <AssignmentManagement canManage={hasTeacherPermission(user, 'assignments', 'edit')} activeBatches={activeBatches} onNotify={triggerNotification} onMarksUpdated={fetchExamAcademicMarks} />}
             {visibleTeacherPage === 'attendance' && (
               <AttendancePanel
                 attendance={attendance}
@@ -1478,7 +1514,22 @@ export default function App() {
                 onRefreshAttendance={fetchAttendanceRecords}
                 onNotify={triggerNotification}
                 activeBatches={activeBatches}
+                allBatches={allBatches}
+                batchDateRanges={batchDateRanges}
                 canEdit={hasTeacherPermission(user, 'attendance', 'edit')}
+              />
+            )}
+            {visibleTeacherPage === 'batchConfig' && hasTeacherPermission(user, 'exam', 'edit') && (
+              <BatchConfiguration
+                key={JSON.stringify([allBatches, activeBatches, batchDateRanges])}
+                onSaveConfig={handleSaveConfig}
+                currentAllBatches={allBatches}
+                currentActiveBatches={activeBatches}
+                currentBatchDateRanges={batchDateRanges}
+                submissions={submissions}
+                onToggleAllGraded={handleToggleAllGraded}
+                canToggleAllGraded={hasTeacherPermission(user, 'grading', 'edit')}
+                triggerNotification={triggerNotification}
               />
             )}
             {visibleTeacherPage === 'contact' && <TeacherContactSettings user={user} onNotify={triggerNotification} />}
@@ -1496,6 +1547,8 @@ export default function App() {
               questionManagementOnly={visibleTeacherPage === 'questions'}
               onQuestionManagementClose={teacherPages.includes('exam') ? () => handleTeacherPageChange('exam') : undefined}
               submissions={submissions}
+              academicMarks={examAcademicMarks}
+              academicMarksLoading={loadingExamAcademicMarks}
               selectedIds={selectedIds}
               setSelectedIds={setSelectedIds}
               onGrade={handleOpenGrading}
@@ -1510,7 +1563,7 @@ export default function App() {
               branchFilter={branchFilter}
               setBranchFilter={setBranchFilter}
               triggerNotification={triggerNotification}
-              openConfigSettings={() => setIsConfigModalOpen(true)}
+              openConfigSettings={() => handleTeacherPageChange('batchConfig')}
               activeBatches={activeBatches}
               batchQuestionSetsLoading={batchQuestionSetsLoading}
               submissionsReady={submissionsLoaded && !loadingSubmissions && !submissionLoadError}
@@ -1534,18 +1587,6 @@ export default function App() {
               batchQuestionSets={batchQuestionSets}
               onSaveBatchQuestionSet={handleSaveBatchQuestionSet}
             />
-            {/* Settings Configuration Modal */}
-              {visibleTeacherPage === 'exam' && hasTeacherPermission(user, 'exam', 'edit') && <ConfigModal
-                isOpen={isConfigModalOpen}
-                onClose={() => setIsConfigModalOpen(false)}
-                onSaveConfig={handleSaveConfig}
-                currentAllBatches={allBatches}  
-                currentActiveBatches={activeBatches}
-                submissions={submissions}
-                onToggleAllGraded={handleToggleAllGraded}
-                canToggleAllGraded={hasTeacherPermission(user, 'grading', 'edit')}
-                triggerNotification={triggerNotification}
-              />}
             </>}
             </div>
             </div>

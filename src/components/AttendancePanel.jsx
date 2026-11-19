@@ -1,6 +1,6 @@
 import { CalendarClock, Copy, KeyRound, Loader2, Power, Printer, QrCode, RefreshCw } from 'lucide-react'
 import QRCode from 'qrcode'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ibblLogo from '/IBBL.jpg'
 
 const getLocalDateKey = (date = new Date()) => {
@@ -9,6 +9,11 @@ const getLocalDateKey = (date = new Date()) => {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+const getPresentDays = (employee, workingDays) => workingDays.filter((date) => (
+  employee.days.some((day) => day.date === date && day.present)
+)).length
+const getAttendanceMark = (presentDays) => Math.min(presentDays, 4) / 2
 
 function AttendancePanel({
   attendance = {},
@@ -20,6 +25,8 @@ function AttendancePanel({
   onRefreshAttendance,
   onNotify,
   activeBatches = [],
+  allBatches = [],
+  batchDateRanges = {},
   canEdit = false,
 }) {
   const getDateRange = (startDate, endDate) => {
@@ -33,18 +40,46 @@ function AttendancePanel({
     }
     return days
   }
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const initialWorkingDays = [yesterday, today, tomorrow].map(getLocalDateKey)
-  const [fromDate, setFromDate] = useState(initialWorkingDays[0])
-  const [toDate, setToDate] = useState(initialWorkingDays[initialWorkingDays.length - 1])
+  const today = getLocalDateKey()
+  const [fromDate, setFromDate] = useState(today)
+  const [toDate, setToDate] = useState(today)
   const workingDays = getDateRange(fromDate, toDate)
-  const [selectedBatch, setSelectedBatch] = useState('All')
+  const [selectedBatch, setSelectedBatch] = useState('')
+  const availableBatches = Array.from(new Set([...activeBatches, ...allBatches]))
+  const currentBatch = selectedBatch || activeBatches[0] || 'All'
+  const onRefreshAttendanceRef = useRef(onRefreshAttendance)
+  const selectedBatchDateRange = currentBatch === 'All' ? null : batchDateRanges[currentBatch]
+  const hasConfiguredBatchRange = Boolean(
+    selectedBatchDateRange?.startDate
+      && selectedBatchDateRange?.endDate
+      && selectedBatchDateRange.startDate <= selectedBatchDateRange.endDate
+  )
+  const reportWorkingDays = hasConfiguredBatchRange
+    ? getDateRange(selectedBatchDateRange.startDate, selectedBatchDateRange.endDate)
+    : currentBatch === 'All' ? workingDays : [today]
+  const canCalculateAttendanceMarks = currentBatch !== 'All' && hasConfiguredBatchRange
   const [codeDate, setCodeDate] = useState(getLocalDateKey)
   const [attendanceQr, setAttendanceQr] = useState('')
+
+  useEffect(() => {
+    onRefreshAttendanceRef.current = onRefreshAttendance
+  }, [onRefreshAttendance])
+
+  useEffect(() => {
+    const reportFromDate = currentBatch !== 'All' && hasConfiguredBatchRange
+      ? selectedBatchDateRange.startDate
+      : currentBatch === 'All' ? fromDate : today
+    const reportToDate = currentBatch !== 'All' && hasConfiguredBatchRange
+      ? selectedBatchDateRange.endDate
+      : currentBatch === 'All' ? toDate : today
+
+    onRefreshAttendanceRef.current?.({
+      fromDate: reportFromDate,
+      toDate: reportToDate,
+      batch: currentBatch,
+      workingDays: getDateRange(reportFromDate, reportToDate),
+    })
+  }, [hasConfiguredBatchRange, currentBatch, selectedBatchDateRange?.startDate, selectedBatchDateRange?.endDate, fromDate, toDate, today])
 
   useEffect(() => {
     let isCurrent = true
@@ -77,15 +112,33 @@ function AttendancePanel({
   }, [attendance.code, attendance.isActive])
 
   const loadReport = () => {
-    if (fromDate > toDate) {
+    const reportFromDate = currentBatch !== 'All' && hasConfiguredBatchRange
+      ? selectedBatchDateRange.startDate
+      : currentBatch === 'All' ? fromDate : today
+    const reportToDate = currentBatch !== 'All' && hasConfiguredBatchRange
+      ? selectedBatchDateRange.endDate
+      : currentBatch === 'All' ? toDate : today
+    if (reportFromDate > reportToDate) {
       onNotify?.('From date, To date-এর আগে হতে পারবে না।', 'error')
       return
     }
-    onRefreshAttendance?.({ fromDate, toDate, batch: selectedBatch, workingDays })
+    onRefreshAttendance?.({
+      fromDate: reportFromDate,
+      toDate: reportToDate,
+      batch: currentBatch,
+      workingDays: getDateRange(reportFromDate, reportToDate),
+    })
   }
 
   const printReport = () => {
-    if (fromDate > toDate) {
+    const reportFromDate = currentBatch !== 'All' && hasConfiguredBatchRange
+      ? selectedBatchDateRange.startDate
+      : currentBatch === 'All' ? fromDate : today
+    const reportToDate = currentBatch !== 'All' && hasConfiguredBatchRange
+      ? selectedBatchDateRange.endDate
+      : currentBatch === 'All' ? toDate : today
+    const periodWorkingDays = getDateRange(reportFromDate, reportToDate)
+    if (reportFromDate > reportToDate) {
       onNotify?.('From date, To date-এর আগে হতে পারবে না।', 'error')
       return
     }
@@ -104,18 +157,19 @@ function AttendancePanel({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
     }[character]))
     const rows = attendanceReport.map((employee, index) => {
-      const days = workingDays.map((date) => employee.days.find((item) => item.date === date) || { date, present: false })
+      const days = periodWorkingDays.map((date) => employee.days.find((item) => item.date === date) || { date, present: false })
       const presentDays = days.filter((day) => day.present).length
+      const attendanceMark = getAttendanceMark(presentDays)
       return `
       <tr><td>${index + 1}</td><td>${escapeHtml(employee.employeeId || '---')}</td><td>${escapeHtml(employee.name)}</td><td>${escapeHtml(employee.branch || '---')}</td>
-      ${workingDays.map((date) => {
+      ${periodWorkingDays.map((date) => {
         const day = employee.days.find((item) => item.date === date)
         return `<td class="${day?.present ? 'present' : 'absent'}">${day?.present ? 'P' : 'A'}</td>`
       }).join('')}
-      <td>${presentDays}</td><td>${days.length - presentDays}</td></tr>
+      <td>${presentDays}</td><td>${days.length - presentDays}</td><td>${canCalculateAttendanceMarks ? `${attendanceMark.toFixed(2)}` : '---'}</td></tr>
     `
     }).join('')
-    const reportHeaders = workingDays.map((date) => `<th>${escapeHtml(date)}</th>`).join('')
+    const reportHeaders = periodWorkingDays.map((date) => `<th>${escapeHtml(date)}</th>`).join('')
 
     printWindow.document.write(`<!doctype html><html><head><title>Class Attendance</title>
       <style>
@@ -138,10 +192,10 @@ function AttendancePanel({
       <header class="report-header">
         <p class="institution">Islami Bank Training and Research Academy</p>
         <h1 class="report-title">Class Attendance</h1>
-        <p class="batch-name">${escapeHtml(selectedBatch)}</p>
-        <p class="date-range">Attendance period: ${escapeHtml(fromDate)} to ${escapeHtml(toDate)}</p>
+        <p class="batch-name">${escapeHtml(currentBatch)}</p>
+        <p class="date-range">Attendance period: ${escapeHtml(reportFromDate)} to ${escapeHtml(reportToDate)}</p>
       </header>
-      <table><thead><tr><th>SL</th><th>Emp ID</th><th>Name</th><th>Branch</th>${reportHeaders}<th>Present</th><th>Absent</th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr><th>SL</th><th>Emp ID</th><th>Name</th><th>Branch</th>${reportHeaders}<th>Present</th><th>Absent</th><th>Attendance mark (2)</th></tr></thead><tbody>${rows}</tbody></table>
       <footer class="report-footer">This is a computer-generated report and does not require a signature.</footer>
       <script>window.onload=function(){window.print();window.onafterprint=function(){window.close()}}</script></body></html>`)
     printWindow.document.close()
@@ -270,20 +324,41 @@ function AttendancePanel({
           <div>
             <h4 className="text-sm font-black text-slate-900">আজকের উপস্থিতি</h4>
             <p className="text-xs text-slate-500 mt-1">যেসব অংশগ্রহণকারী কোড দিয়ে হাজিরা দিয়েছেন</p>
+            <p className="mt-1 text-xs text-emerald-700">
+              {currentBatch === 'All'
+                ? 'নম্বর দেখতে একটি নির্দিষ্ট ব্যাচ নির্বাচন করুন।'
+                : hasConfiguredBatchRange
+                  ? 'নির্বাচিত ব্যাচের নির্ধারিত সময়সীমায় প্রতি উপস্থিত দিনে ১ কাঁচা নম্বর; সর্বোচ্চ ৪ থেকে ২-এ রূপান্তর।'
+                  : 'নম্বর হিসাবের জন্য পরীক্ষা কনফিগারেশন থেকে ব্যাচের শুরু ও শেষ তারিখ সেট করুন।'}
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end lg:flex-nowrap">
             <div className="col-span-2 grid grid-cols-2 gap-2 sm:contents">
               <label className="min-w-0 text-xs font-bold text-slate-500 lg:w-36 lg:flex-none">From
-                <input type="date" value={fromDate} max={toDate} onChange={(event) => setFromDate(event.target.value)} className="block w-full min-w-0 mt-1 px-2 py-2 rounded-xl border border-slate-200 text-xs text-slate-700" />
+                <input
+                  type="date"
+                  value={currentBatch === 'All' ? fromDate : selectedBatchDateRange?.startDate || today}
+                  max={currentBatch === 'All' ? toDate : selectedBatchDateRange?.endDate || undefined}
+                  onChange={(event) => setFromDate(event.target.value)}
+                  disabled={currentBatch !== 'All'}
+                  className="block w-full min-w-0 mt-1 px-2 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 disabled:bg-slate-100"
+                />
               </label>
               <label className="min-w-0 text-xs font-bold text-slate-500 lg:w-36 lg:flex-none">To
-                <input type="date" value={toDate} min={fromDate} onChange={(event) => setToDate(event.target.value)} className="block w-full min-w-0 mt-1 px-2 py-2 rounded-xl border border-slate-200 text-xs text-slate-700" />
+                <input
+                  type="date"
+                  value={currentBatch === 'All' ? toDate : selectedBatchDateRange?.endDate || today}
+                  min={currentBatch === 'All' ? fromDate : selectedBatchDateRange?.startDate || undefined}
+                  onChange={(event) => setToDate(event.target.value)}
+                  disabled={currentBatch !== 'All'}
+                  className="block w-full min-w-0 mt-1 px-2 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 disabled:bg-slate-100"
+                />
               </label>
             </div>
             <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_2.75rem_2.75rem] items-end gap-2 sm:contents">
-              <select value={selectedBatch} onChange={(event) => setSelectedBatch(event.target.value)} className="w-full min-w-0 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 lg:w-48 lg:flex-none">
-                <option value="All">All active batches</option>
-                {activeBatches.map((batch) => <option key={batch} value={batch}>{batch}</option>)}
+              <select value={currentBatch} onChange={(event) => setSelectedBatch(event.target.value)} className="w-full min-w-0 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 lg:w-48 lg:flex-none">
+                <option value="All">All batches</option>
+                {availableBatches.map((batch) => <option key={batch} value={batch}>{batch}</option>)}
               </select>
               <button
                 type="button"
@@ -319,48 +394,52 @@ function AttendancePanel({
                 <th className="px-4 py-3 font-bold">Employee ID</th>
                 <th className="px-4 py-3 font-bold">নাম</th>
                 <th className="px-4 py-3 font-bold">Branch</th>
-                {workingDays.map((date) => <th key={date} className="px-4 py-3 font-bold">{date}</th>)}
+                {reportWorkingDays.map((date) => <th key={date} className="px-4 py-3 font-bold">{date}</th>)}
                 <th className="px-4 py-3 font-bold">Present</th>
                 <th className="px-4 py-3 font-bold">Absent</th>
+                <th className="px-4 py-3 font-bold">Attendance mark (2)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {attendanceLoading ? (
                 <tr>
-                  <td colSpan={workingDays.length + 6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={reportWorkingDays.length + 7} className="px-4 py-8 text-center text-slate-500">
                     <Loader2 className="h-5 w-5 mx-auto mb-2 animate-spin text-emerald-600" />
                     হাজিরার তালিকা লোড হচ্ছে...
                   </td>
                 </tr>
               ) : attendanceReport.length === 0 ? (
                 <tr>
-                  <td colSpan={workingDays.length + 6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={reportWorkingDays.length + 7} className="px-4 py-8 text-center text-slate-500">
                     এই active batch-এর কোনো student পাওয়া যায়নি।
                   </td>
                 </tr>
               ) : (
-                attendanceReport.map((employee, index) => (
-                  <tr key={employee.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3 text-center text-xs font-bold text-slate-500">{index + 1}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-600">{employee.employeeId || '---'}</td>
-                    <td className="px-4 py-3 font-bold text-slate-900">{employee.name}</td>
-                    <td className="px-4 py-3 text-slate-600">{employee.branch || '---'}</td>
-                    {workingDays.map((date) => {
-                      const day = employee.days.find((item) => item.date === date)
-                      return (
-                      <td key={date} className={`px-4 py-3 text-center text-xs font-black ${day?.present ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        {day?.present ? 'P' : 'A'}
+                attendanceReport.map((employee, index) => {
+                  const presentDays = getPresentDays(employee, reportWorkingDays)
+                  const attendanceMark = getAttendanceMark(presentDays)
+                  return (
+                    <tr key={employee.id} className="hover:bg-slate-50/60">
+                      <td className="px-4 py-3 text-center text-xs font-bold text-slate-500">{index + 1}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-600">{employee.employeeId || '---'}</td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{employee.name}</td>
+                      <td className="px-4 py-3 text-slate-600">{employee.branch || '---'}</td>
+                      {reportWorkingDays.map((date) => {
+                        const day = employee.days.find((item) => item.date === date)
+                        return (
+                          <td key={date} className={`px-4 py-3 text-center text-xs font-black ${day?.present ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {day?.present ? 'P' : 'A'}
+                          </td>
+                        )
+                      })}
+                      <td className="px-4 py-3 text-center font-bold text-emerald-700">{presentDays}</td>
+                      <td className="px-4 py-3 text-center font-bold text-rose-700">{reportWorkingDays.length - presentDays}</td>
+                      <td className="px-4 py-3 text-center font-bold text-emerald-800">
+                        {canCalculateAttendanceMarks ? `${attendanceMark.toFixed(2)}` : '---'}
                       </td>
-                      )
-                    })}
-                    <td className="px-4 py-3 text-center font-bold text-emerald-700">
-                      {workingDays.filter((date) => employee.days.some((day) => day.date === date && day.present)).length}
-                    </td>
-                    <td className="px-4 py-3 text-center font-bold text-rose-700">
-                      {workingDays.length - workingDays.filter((date) => employee.days.some((day) => day.date === date && day.present)).length}
-                    </td>
-                  </tr>
-                ))
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>

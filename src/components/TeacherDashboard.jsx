@@ -2,11 +2,14 @@ import { Fragment, useState } from 'react'
 import { ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, ChevronDown, Download, FileText, Loader2, RefreshCw, Search, Settings, ShieldCheck } from 'lucide-react'
 import AttendancePanel from './AttendancePanel'
 import QuestionManagement from './QuestionManagement'
+import { getAcademicMarksForSubmission, getCombinedTotalMarks } from '../utils/academicMarks'
 
 function TeacherDashboard({
   questionManagementOnly = false,
   onQuestionManagementClose,
   submissions = [],
+  academicMarks = {},
+  academicMarksLoading = false,
   selectedIds = [],
   setSelectedIds,
   onGrade,
@@ -68,17 +71,7 @@ function TeacherDashboard({
   const allAvailableBatches = Array.from(
     new Set([...(activeBatches || []), ...submissionBatches].filter((batch) => batch && batch.trim() !== ''))
   )
-  const columnCount = 7 + (canViewMarks ? 5 : 0) + (canViewMarks || canGrade ? 1 : 0)
-
-  const getTotalMarksForSort = (submission) => {
-    const writtenMarks = submission.marks !== undefined && submission.marks !== null
-      ? parseFloat(submission.marks)
-      : null
-    const vivaMarks = submission.viva_marks ?? submission.vivaMarks ?? ''
-    return submission.total_marks ?? submission.totalMarks ?? (
-      writtenMarks !== null ? writtenMarks + (parseFloat(vivaMarks) || 0) : ''
-    )
-  }
+  const columnCount = 7 + (canViewMarks ? 7 : 0) + (canViewMarks || canGrade ? 1 : 0)
 
   const filteredSubmissions = submissions.filter((sub) => {
     const query = searchQuery.toLowerCase()
@@ -103,8 +96,12 @@ function TeacherDashboard({
     const genderComparison = getGenderSortOrder(first.gender) - getGenderSortOrder(second.gender)
     if (genderComparison !== 0) return genderComparison
 
-    const firstValue = sortBy === 'id' ? first.userId : sortBy === 'marks' ? first.marks : getTotalMarksForSort(first)
-    const secondValue = sortBy === 'id' ? second.userId : sortBy === 'marks' ? second.marks : getTotalMarksForSort(second)
+    const firstValue = sortBy === 'id'
+      ? first.userId
+      : sortBy === 'marks' ? first.marks : getCombinedTotalMarks(first, academicMarks)
+    const secondValue = sortBy === 'id'
+      ? second.userId
+      : sortBy === 'marks' ? second.marks : getCombinedTotalMarks(second, academicMarks)
     const firstText = String(firstValue ?? '').trim()
     const secondText = String(secondValue ?? '').trim()
 
@@ -228,9 +225,9 @@ function TeacherDashboard({
           {canManageExam && <button
             onClick={openConfigSettings}
             className="flex items-center justify-center gap-2 p-3 text-center text-xs font-bold text-slate-700 transition-all rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-150 sm:justify-start sm:text-left"
-            title="Settings"
+            title="Batch Configuration"
           >
-            <Settings className="h-4 w-4" /> Settings
+            <Settings className="h-4 w-4" /> Batch Config
           </button>}
 
           {onManageUsers && <button onClick={onManageUsers} className="flex items-center justify-center gap-2 p-3 text-center text-xs font-bold text-slate-700 transition-all rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-150 sm:justify-start sm:text-left" title="User management">
@@ -322,13 +319,16 @@ function TeacherDashboard({
         {/* Export Buttons */}
         {canViewMarks && <div className="col-span-2 flex gap-2 lg:col-span-1">
           <button
-            onClick={() => onExportExcel(filteredSubmissions, triggerNotification, questions)}
+            onClick={() => onExportExcel(filteredSubmissions, triggerNotification, questions, academicMarks)}
             className="flex-1 px-3 py-3 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-950 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors"
           >
             <Download className="h-4 w-4" /> Export CSV
           </button>
           <button
-            onClick={() => onGenerateSummaryPDF(filteredSubmissions, triggerNotification, { batch: selectedReportBatch })}
+            onClick={() => onGenerateSummaryPDF(filteredSubmissions, triggerNotification, {
+              batch: selectedReportBatch,
+              academicMarks,
+            })}
             className="flex-1 px-3 py-3 bg-emerald-50 hover:bg-emerald-100 text-[#1B4D1A] font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-sm border border-emerald-200 transition-colors"
           >
             <FileText className="h-4 w-4" /> Summary PDF
@@ -412,9 +412,11 @@ function TeacherDashboard({
                     </button>
                   </th>
                   <th className="py-3 px-2 text-center sm:py-4 sm:px-4">ভাইভা (৫)</th>
+                  <th className="py-3 px-2 text-center sm:py-4 sm:px-4">হাজিরা (২)</th>
+                  <th className="py-3 px-2 text-center sm:py-4 sm:px-4">অ্যাসাইনমেন্ট গড় (৩)</th>
                   <th className="py-3 px-2 text-center sm:py-4 sm:px-4" aria-sort={sortBy === 'totalMarks' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                     <button type="button" onClick={() => handleSort('totalMarks')} className="inline-flex items-center justify-center gap-1.5" aria-label={`Sort by total marks ${sortBy === 'totalMarks' && sortDirection === 'desc' ? 'ascending' : 'descending'}`}>
-                      মোট নম্বর (১৫) {sortIcon('totalMarks')}
+                      মোট নম্বর (২০) {sortIcon('totalMarks')}
                     </button>
                   </th>
                 </>}
@@ -475,9 +477,8 @@ function TeacherDashboard({
                   const isGraded = sub.status === 'Graded' || sub.status === 'graded';
 
                   // Total Marks
-                  const totalMarks = sub.total_marks ?? sub.totalMarks ?? (
-                    isEvaluated ? existingMarks + (parseFloat(vivaValue) || 0) : '---'
-                  )
+                  const totalMarks = getCombinedTotalMarks(sub, academicMarks)
+                  const rowAcademicMarks = getAcademicMarksForSubmission(sub, academicMarks)
 
                   return (
                     <tr key={sub.id || idx} className={`hover:bg-slate-50/40 transition-colors ${isChecked ? 'bg-emerald-50/20' : ''}`}>
@@ -541,9 +542,26 @@ function TeacherDashboard({
                         />
                       </td>}
 
+                      {canViewMarks && <td className="py-3 px-2 text-center font-bold text-emerald-800 sm:py-4 sm:px-4">
+                        {academicMarksLoading
+                          ? '...'
+                          : rowAcademicMarks?.attendanceMarks == null
+                            ? '---'
+                            : `${Number(rowAcademicMarks.attendanceMarks).toFixed(2)}`}
+                      </td>}
+                      {canViewMarks && <td className="py-3 px-2 text-center font-bold text-sky-800 sm:py-4 sm:px-4">
+                        {academicMarksLoading
+                          ? '...'
+                          : rowAcademicMarks?.assignmentMarks == null
+                            ? '---'
+                            : `${Number(rowAcademicMarks.assignmentMarks).toFixed(2)}`}
+                      </td>}
+
                       {/* Total Marks */}
                       {canViewMarks && <td className="py-3 px-2 text-center font-black text-base text-emerald-800 sm:py-4 sm:px-4">
-                        {totalMarks}
+                        {academicMarksLoading
+                          ? '...'
+                          : totalMarks == null ? '---' : `${totalMarks.toFixed(2)}`}
                       </td>}
 
                       {(canViewMarks || canGrade) && <td className="py-3 px-3 sm:py-4 sm:px-6">

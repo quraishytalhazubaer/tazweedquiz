@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { BookOpen, ClipboardCheck, ClipboardList, KeyRound, ListChecks, Menu, MessageCircle, UserRound, Users, X } from 'lucide-react'
+import { BookOpen, ClipboardCheck, ClipboardList, KeyRound, Layers, ListChecks, Menu, MessageCircle, UserRound, Users, X } from 'lucide-react'
 
 const navigationItems = [
   { id: 'materials', label: 'Course Material', icon: BookOpen },
   { id: 'assignments', label: 'Assignments', icon: ClipboardList },
   { id: 'exam', label: 'Exam Dashboard', icon: ClipboardCheck },
+  { id: 'batchConfig', label: 'Batch Configuration', icon: Layers },
   { id: 'questions', label: 'Question Management', icon: ListChecks },
   { id: 'attendance', label: 'Attendance', icon: KeyRound },
   { id: 'contact', label: 'My Contact', icon: MessageCircle },

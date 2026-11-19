@@ -1,48 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { X, Plus, Layers, Check, Loader2, Settings } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Layers, Check, Loader2, Settings } from 'lucide-react';
 
-export default function SettingsModal({
-  isOpen,
-  onClose,
+export default function BatchConfiguration({
   onSaveConfig,
   currentActiveBatches = [],
   currentAllBatches = [],
+  currentBatchDateRanges = {},
   submissions = [],
   triggerNotification,
   onToggleAllGraded,
   canToggleAllGraded = false,
 }) {
-  const [activeBatches, setActiveBatches] = useState([]);
-  const [allBatches, setAllBatches] = useState([]); // Fixed: Defined setAllBatches state
+  const [activeBatches, setActiveBatches] = useState(currentActiveBatches);
+  const [allBatches, setAllBatches] = useState(() => {
+    const existingSubBatches = (submissions || [])
+      .map((sub) => sub?.batch || sub?.userBatchGroup)
+      .filter(Boolean);
+    return Array.from(new Set([
+      ...(currentAllBatches || []),
+      ...(currentActiveBatches || []),
+      ...existingSubBatches,
+    ])).filter((batch) => batch && typeof batch === 'string' && batch.trim() !== '');
+  });
   const [newBatchName, setNewBatchName] = useState('');
   const [saving, setSaving] = useState(false);
-
-  // FIXED: Dependency array strictly contains [isOpen].
-  // Array lengths must never change between renders.
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const existingSubBatches = Array.from(
-      new Set(
-        (submissions || [])
-          .map((sub) => sub?.batch || sub?.userBatchGroup)
-          .filter(Boolean)
-      )
-    );
-
-    const masterList = Array.from(
-      new Set([
-        ...(currentAllBatches || []),
-        ...(currentActiveBatches || []),
-        ...existingSubBatches
-      ])
-    ).filter((b) => b && typeof b === 'string' && b.trim() !== '');
-
-    setAllBatches(masterList);
-    setActiveBatches(currentActiveBatches || []);
-  }, [isOpen]); 
-
-  if (!isOpen) return null;
+  const [batchDateRanges, setBatchDateRanges] = useState(currentBatchDateRanges);
 
   // Checks if EVERY submission currently has status 'Graded'
   const isAllGraded =
@@ -77,18 +59,39 @@ export default function SettingsModal({
 
     setAllBatches((prev) => [...prev, trimmed]);
     setActiveBatches((prev) => [...prev, trimmed]);
+    setBatchDateRanges((current) => ({ ...current, [trimmed]: { startDate: '', endDate: '' } }));
     setNewBatchName('');
     triggerNotification(`ব্যাচ "${trimmed}" তৈরি ও সক্রিয় করা হয়েছে।`, 'success');
   };
 
+  const updateBatchDate = (batch, field, value) => {
+    setBatchDateRanges((current) => ({
+      ...current,
+      [batch]: { ...(current[batch] || {}), [field]: value },
+    }));
+  };
+
   const handleSave = async () => {
+    const invalidBatch = allBatches.find((batch) => {
+      const range = batchDateRanges[batch];
+      return Boolean(
+        (range?.startDate && !range?.endDate)
+          || (!range?.startDate && range?.endDate)
+          || (range?.startDate && range?.endDate && range.startDate > range.endDate)
+      );
+    });
+    if (invalidBatch) {
+      triggerNotification(`${invalidBatch} ব্যাচের শুরু ও শেষ তারিখ দুটিই দিন, অথবা দুটিই ফাঁকা রাখুন।`, 'error');
+      return;
+    }
+
     setSaving(true);
     try {
       await onSaveConfig({
         activeBatches,
-        allBatches
+        allBatches,
+        batchDateRanges,
       });
-      onClose();
     } catch (err) {
       console.error('Failed to save batch config:', err);
       triggerNotification('সেটিংস আপডেট করতে ব্যর্থ হয়েছে।', 'error');
@@ -98,26 +101,18 @@ export default function SettingsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-slide-in">
-      <div className="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 border border-slate-200 shadow-2xl space-y-6">
-        
-        {/* Header */}
-        <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+    <section className="space-y-5 animate-slide-in">
+      <div className="bg-white rounded-3xl w-full p-6 md:p-8 border border-slate-200 shadow-sm space-y-6">
+        <div className="border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2.5">
             <div className="p-2.5 bg-emerald-50 rounded-2xl text-emerald-800">
               <Settings className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-950">পরীক্ষা কনফিগারেশন (Settings)</h3>
-              <p className="text-xs text-slate-500 font-medium">সক্রিয় ব্যাচ পরিচালনা ও নতুন ব্যাচ তৈরি করুন</p>
+              <h2 className="text-xl font-black text-slate-950">ব্যাচ কনফিগারেশন (Batch Configuration)</h2>
+              <p className="text-xs text-slate-500 font-medium">ব্যাচ, সক্রিয় অবস্থা এবং হাজিরার তারিখসীমা পরিচালনা করুন</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         {/* Status Toggle Row */}
@@ -202,14 +197,45 @@ export default function SettingsModal({
           </div>
         </form>
 
-        {/* Modal Actions */}
+        <div className="space-y-3">
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">ব্যাচের তারিখসীমা (Attendance Period)</h4>
+            <p className="mt-1 text-xs text-slate-500">প্রতিটি ব্যাচের শুরু ও শেষ তারিখসহ উপস্থিতির নম্বর হিসাব হবে।</p>
+          </div>
+          <div className="max-h-64 space-y-2 overflow-y-auto">
+            {allBatches.map((batch) => (
+              <div key={batch} className="grid gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_1fr_1fr] sm:items-end">
+                <p className="text-sm font-bold text-slate-800">{batch}</p>
+                <label className="text-xs font-semibold text-slate-600">
+                  শুরু
+                  <input
+                    type="date"
+                    value={batchDateRanges[batch]?.startDate || ''}
+                    max={batchDateRanges[batch]?.endDate || undefined}
+                    onChange={(event) => updateBatchDate(batch, 'startDate', event.target.value)}
+                    aria-label={`${batch} ব্যাচের শুরু তারিখ`}
+                    className="mt-1 block w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  শেষ
+                  <input
+                    type="date"
+                    value={batchDateRanges[batch]?.endDate || ''}
+                    min={batchDateRanges[batch]?.startDate || undefined}
+                    onChange={(event) => updateBatchDate(batch, 'endDate', event.target.value)}
+                    aria-label={`${batch} ব্যাচের শেষ তারিখ`}
+                    className="mt-1 block w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                  />
+                </label>
+              </div>
+            ))}
+            {!allBatches.length && <p className="text-sm text-slate-500">আগে একটি ব্যাচ যোগ করুন।</p>}
+          </div>
+        </div>
+
+        {/* Page Actions */}
         <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
-          >
-            বাতিল
-          </button>
           <button
             onClick={handleSave}
             disabled={saving}
@@ -220,6 +246,6 @@ export default function SettingsModal({
           </button>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

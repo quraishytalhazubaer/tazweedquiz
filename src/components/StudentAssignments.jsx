@@ -286,6 +286,11 @@ function StudentAssignments({ profile, userId, onNotify }) {
                             {target.due_at ? `শেষ সময়: ${new Date(target.due_at).toLocaleString()}` : 'কোনো সময়সীমা নেই'}
                             {isSubmitted && ` · জমা: ${new Date(submission.submitted_at).toLocaleString()}`}
                           </p>
+                          {isSubmitted && (
+                            <p className="mt-2 text-xs font-bold text-emerald-700">
+                              অ্যাসাইনমেন্ট নম্বর: {submission.marks == null ? 'মূল্যায়ন হয়নি' : `${submission.marks} / 3`}
+                            </p>
+                          )}
                         </div>
                         <span className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${isSubmitted ? 'bg-emerald-50 text-emerald-800' : submission ? 'bg-sky-50 text-sky-800' : pastDue ? 'bg-slate-100 text-slate-500' : 'bg-amber-50 text-amber-800'}`}>
                           {isSubmitted ? <CheckCircle2 className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}

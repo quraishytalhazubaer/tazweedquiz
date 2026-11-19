@@ -1,4 +1,5 @@
 import { getQuestionAnswer, getQuestionCorrectAnswer, getQuestionText } from './questionAnswers'
+import { getAcademicMarksForSubmission, getCombinedTotalMarks, getExamTotalMarks } from './academicMarks'
 
 // --- 1. Comprehensive Script Loader (Exposes all global namespaces cleanly) ---
 const loadAllPdfLibraries = () => {
@@ -39,22 +40,32 @@ const loadAllPdfLibraries = () => {
 };
 
 // --- Excel / CSV Export (Unchanged & Working) ---
-export const handleExportExcel = (submissions, notify, questions = []) => {
+export const handleExportExcel = (submissions, notify, questions = [], academicMarks = {}) => {
   if (!submissions || submissions.length === 0) {
     notify('ডাউনলোড করার মতো কোনো তথ্য নেই।', 'error');
     return;
   }
 
-  const headers = ['Name', 'EMP. ID', 'Branch', 'Date', 'Marks', ...questions.map((_, index) => `Q${index + 1}`)];
+  const headers = [
+    'Name', 'EMP. ID', 'Branch', 'Date', 'Written (10)', 'Viva (5)',
+    'Exam Total (15)', 'Attendance (2)', 'Assignment (3)', 'Total (20)',
+    ...questions.map((_, index) => `Q${index + 1}`),
+  ];
   const csvRows = [headers.join(',')];
 
   submissions.forEach((sub) => {
+    const studentAcademicMarks = getAcademicMarksForSubmission(sub, academicMarks)
     const row = [
       sub.userName || '',
       sub.userId || '',
       sub.userBranch || '',
       sub.date || '',
-      sub.marks !== undefined ? sub.marks : 0,
+      sub.marks ?? '',
+      sub.viva_marks ?? sub.vivaMarks ?? '',
+      getExamTotalMarks(sub) ?? '',
+      studentAcademicMarks.attendanceMarks ?? '',
+      studentAcademicMarks.assignmentMarks ?? '',
+      getCombinedTotalMarks(sub, academicMarks) ?? '',
       ...questions.map((question, index) => getQuestionAnswer(sub, question, index))
     ].map((field) => `"${(field ?? '').toString().replace(/"/g, '""')}"`);
 
@@ -73,7 +84,7 @@ export const handleExportExcel = (submissions, notify, questions = []) => {
 };
 
 // --- 2. Summary PDF Engine ---
-export const generateSummaryPDF = async (submissions, notify) => {
+export const generateSummaryPDF = async (submissions, notify, { academicMarks = {} } = {}) => {
   if (!submissions || submissions.length === 0) {
     notify('No data found to export.', 'error');
     return;
@@ -84,23 +95,23 @@ export const generateSummaryPDF = async (submissions, notify) => {
     await loadAllPdfLibraries(); 
     
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
     // Header Layout
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(16);
     doc.setTextColor(27, 77, 26);
-    doc.text('Islami Bank Training and Research Academy', 105, 15, { align: 'center' });
+    doc.text('Islami Bank Training and Research Academy', 148.5, 15, { align: 'center' });
 
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(75, 85, 99);
-    doc.text('13A/2A, Block # B, Babar Road, Mohammadpur, Dhaka-1207, Bangladesh', 105, 21, { align: 'center' });
+    doc.text('13A/2A, Block # B, Babar Road, Mohammadpur, Dhaka-1207, Bangladesh', 148.5, 21, { align: 'center' });
 
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(17, 24, 37);
-    doc.text('Tajweed Quiz - Consolidated Result Sheet', 105, 29, { align: 'center' });
+    doc.text('Tajweed Quiz - Consolidated Result Sheet', 148.5, 29, { align: 'center' });
 
     // doc.setFont('Helvetica', 'normal');
     // doc.setFontSize(9);
@@ -114,12 +125,25 @@ export const generateSummaryPDF = async (submissions, notify) => {
     doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 152, 40)
 
     // Explicit Type Conversion to Strings
-    const tableHeaders = [['SL', 'Emp. ID', 'Name', 'Branch', 'Written (10)', 'Viva (5)', 'Total Marks (15)']];
+    const tableHeaders = [[
+      'SL', 'Emp. ID', 'Name', 'Branch', 'Written (10)', 'Viva (5)',
+      'Exam Total (15)', 'Attendance (2)', 'Assignment (3)', 'Total (20)',
+    ]];
     const tableRows = submissions.map((sub, index) => {
       const writtenMarks = Number.isFinite(Number(sub.marks)) ? Number(sub.marks) : 0;
       const vivaMarks = sub.viva_marks == null || !Number.isFinite(Number(sub.viva_marks))
         ? 0
         : Number(sub.viva_marks);
+      const studentAcademicMarks = getAcademicMarksForSubmission(sub, academicMarks);
+      const attendanceMarks = studentAcademicMarks.attendanceMarks == null
+        || !Number.isFinite(Number(studentAcademicMarks.attendanceMarks))
+        ? '---'
+        : Number(studentAcademicMarks.attendanceMarks).toFixed(2);
+      const assignmentMarks = studentAcademicMarks.assignmentMarks == null
+        || !Number.isFinite(Number(studentAcademicMarks.assignmentMarks))
+        ? '---'
+        : Number(studentAcademicMarks.assignmentMarks).toFixed(2);
+      const combinedTotal = getCombinedTotalMarks(sub, academicMarks);
 
       return [
         String(index + 1),
@@ -128,7 +152,12 @@ export const generateSummaryPDF = async (submissions, notify) => {
         String(sub.userBranch || '---'),
         String(sub.marks == null ? '---' : writtenMarks),
         String(vivaMarks),
-        String(writtenMarks + vivaMarks),
+        String(getExamTotalMarks(sub) ?? '---'),
+        String(attendanceMarks),
+        String(assignmentMarks),
+        String(combinedTotal == null
+          ? '---'
+          : `${combinedTotal.toFixed(2)}`),
       ];
     });
 
@@ -141,35 +170,40 @@ export const generateSummaryPDF = async (submissions, notify) => {
       headStyles: { fillColor: [27, 77, 26], textColor: [255, 255, 255], fontStyle: 'bold' },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
-        1: { fontStyle: 'bold', cellWidth: 20 },
+        1: { fontStyle: 'bold', cellWidth: 22 },
         2: { fontStyle: 'bold', textColor: [17, 24, 37] },
-        3: { cellWidth: 45 },
-        4: { halign: 'center', fontStyle: 'bold', textColor: [27, 77, 26], cellWidth: 25 }
+        3: { cellWidth: 40 },
+        4: { halign: 'center', fontStyle: 'bold', textColor: [27, 77, 26], cellWidth: 20 },
+        5: { halign: 'center', cellWidth: 16 },
+        6: { halign: 'center', cellWidth: 23 },
+        7: { halign: 'center', cellWidth: 23 },
+        8: { halign: 'center', cellWidth: 25 },
+        9: { halign: 'center', fontStyle: 'bold', cellWidth: 27 },
       },
       styles: { fontSize: 9, cellPadding: 3, font: 'Helvetica' },
-      margin: { bottom: 35 }
+      margin: { bottom: 25 }
     });
 
     // Handle Signature Segment
     let finalY = doc.lastAutoTable.finalY + 20;
-    if (finalY > 255) {
+    if (finalY > 185) {
       doc.addPage();
       finalY = 35;
     }
 
     doc.setDrawColor(75, 85, 99);
     doc.setLineWidth(0.4);
-    doc.line(140, finalY, 190, finalY);
+    doc.line(235, finalY, 280, finalY);
     
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(27, 77, 26);
-    doc.text('Talha Zubaer Siddique Al-Quraishy', 165, finalY + 5, { align: 'center' });
+    doc.text('Talha Zubaer Siddique Al-Quraishy', 257.5, finalY + 5, { align: 'center' });
     
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(107, 114, 128);
-    doc.text('Instructor', 165, finalY + 10, { align: 'center' });
+    doc.text('Instructor', 257.5, finalY + 10, { align: 'center' });
 
     doc.save(`IBTRA_Consolidated_Results_${Date.now()}.pdf`);
     notify('Summary PDF downloaded successfully.', 'success');
